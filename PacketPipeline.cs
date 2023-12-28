@@ -1,16 +1,17 @@
 ﻿using Nest;
 using PacketDataIndexer.Resources;
 using StackExchange.Redis;
-using System.Net;
-using System.Net.NetworkInformation;
 
 namespace PacketDataIndexer
 {
     internal class PacketPipeline : BackgroundService
     {
-        private readonly IDatabase _redisDatabase;
-        private readonly ConnectionMultiplexer _redisConnection;
-        private readonly ElasticClient _elasticClient;
+        private IDatabase _redisDatabase;
+        private ConnectionMultiplexer _redisConnection;
+        private ElasticClient _elasticClient;
+        private Task? _redisTask;
+        private Task? _elasticTask;
+
         private readonly IConfiguration _config;
         private readonly ILogger<PacketPipeline> _logger;
 
@@ -19,94 +20,93 @@ namespace PacketDataIndexer
             _config = config;
             _logger = logger;
 
-            //var connectionStrings = _config.GetSection("ConnectionStrings");
-            //if (connectionStrings["RedisConnection"] == null)
-            //{
-            //    _logger.LogError(Error.FailedToReadElasticConnectionString);
-            //    Environment.Exit(1);
-            //}
-            //while (true)
-            //{
-            //    try
-            //    {
-            //        _redisConnection = ConnectionMultiplexer.Connect(connectionStrings["RedisConnection"]!);
-            //        _redisDatabase = _redisConnection.GetDatabase();
-            //        break;
-            //    }
-            //    catch
-            //    {
-            //        _logger.LogError(Error.NoConnectionToRedis);
-            //        Task.Delay(10000).Wait();
-            //    }
-            //}
+            var connectionString = _config.GetSection("ConnectionStrings");
+            if (connectionString["RedisConnection"] == null)
+            {
+                _logger.LogError(Error.FailedToReadElasticConnectionString);
+                Environment.Exit(1);
+            }
+            _redisTask = Task.Run(async () =>
+            {
+                while (true)
+                {
+                    try
+                    {
+                        _redisConnection = ConnectionMultiplexer.Connect(connectionString["RedisConnection"]!);
+                        _redisDatabase = _redisConnection.GetDatabase();
+                        break;
+                    }
+                    catch
+                    {
+                        _logger.LogError(Error.NoConnectionToRedis);
+                        await Task.Delay(2000);
+                    }
+                }
+            });
 
-            //if (connectionStrings["ElasticClient"] == null)
+            //if (connectionString["ElasticClient"] == null)
             //{
             //    _logger?.LogError(Error.FailedToReadElasticConnectionString);
             //    Environment.Exit(1);
             //}
-            //while (true)
-            //{
-            //    try
-            //    {
-            //        var settings = new ConnectionSettings(new Uri(connectionStrings["ElasticConnection"]!));
-            //        _elasticClient = new ElasticClient(settings);
-            //    }
-            //    catch
-            //    {
-            //        _logger.LogError(Error.NoConnectionToElastic);
-            //        Environment.Exit(1);
-            //    }
-            //}
+            _elasticTask = Task.Run(async () =>
+            {
+                //while (true)
+                //{
+                //    try
+                //    {
+                //        var settings = new ConnectionSettings(new Uri(connectionString["ElasticConnection"]!));
+                //        _elasticClient = new ElasticClient(settings);
+                //        break;
+                //    }
+                //    catch
+                //    {
+                //        _logger.LogError(Error.NoConnectionToElastic);
+                //        await Task.Delay(2000);
+                //    }
+                //}
+            });
         }
 
         protected async override Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            GetLocalNetworkMachineNames();
+            await Task.WhenAll(_redisTask!, _elasticTask!);           
+
+            var agents = GetRedisKeys();
+            foreach (var agent in agents)
+            {
+                
+            }
+
+            await _redisConnection.CloseAsync();
+
+            _redisTask!.Dispose();
+            _redisTask = null;
+            _elasticTask!.Dispose();
+            _elasticTask = null;
         }
 
-        private void GetLocalNetworkMachineNames()
+        private List<RedisKey> GetRedisKeys()
         {
+            IServer? server = default;
+            var agents = new List<RedisKey>();
+
             try
             {
-                var networkInterfaces = NetworkInterface.GetAllNetworkInterfaces();
-                foreach (var networkInterface in networkInterfaces)
-                {
-                    if (networkInterface.OperationalStatus == OperationalStatus.Up 
-                        && !networkInterface.Description.ToLowerInvariant().Contains("virtual"))
-                    {
-                        var ipProperties = networkInterface.GetIPProperties();
-                        foreach (var ipAddress in ipProperties.UnicastAddresses) 
-                        {
-                            if (ipAddress.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
-                                && !IPAddress.IsLoopback(ipAddress.Address))
-                            {
-                                var networkAddress = ipAddress.Address.ToString();
-                                var networkAddressParts = networkAddress.Split('.');
-                                var subnet = $"{networkAddressParts[0]}.{networkAddressParts[1]}.{networkAddressParts[2]}";
-
-                                using (var ping = new Ping())
-                                {
-                                    for (int i = 1; i < 255; i++)
-                                    {
-                                        var targetIP = $"{subnet}.{i}";
-                                        var reply = ping.Send(targetIP, 100);
-                                        if (reply != null && reply.Status == IPStatus.Success)
-                                        {
-                                            var hostEntry = Dns.GetHostEntry(targetIP);
-                                            Console.WriteLine($"{targetIP} - {hostEntry.HostName}");
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                server = _redisConnection.GetServer(_config["ConnectionStrings:RedisConnection"]!, 6379);
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine(ex.Message);
+                _logger.LogError(Error.NoConnectionToRedisServer);
+                Environment.Exit(1);
             }
+
+            foreach (var key in server!.Keys(pattern: "host_*"))
+            {
+                agents.Add(new RedisKey(key));
+            }
+            
+            return agents;
         }
     }
 }

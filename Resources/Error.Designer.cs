@@ -95,5 +95,14 @@ namespace PacketDataIndexer.Resources {
                 return ResourceManager.GetString("NoConnectionToRedis", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось установить соединение с сервером Redis.
+        /// </summary>
+        internal static string NoConnectionToRedisServer {
+            get {
+                return ResourceManager.GetString("NoConnectionToRedisServer", resourceCulture);
+            }
+        }
     }
 }

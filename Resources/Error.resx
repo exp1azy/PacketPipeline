@@ -129,4 +129,7 @@
   <data name="NoConnectionToRedis" xml:space="preserve">
     <value>Не удалось установить соединение с Redis</value>
   </data>
+  <data name="NoConnectionToRedisServer" xml:space="preserve">
+    <value>Не удалось установить соединение с сервером Redis</value>
+  </data>
 </root>
