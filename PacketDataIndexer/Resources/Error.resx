@@ -117,11 +117,17 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="FailedToReadClearTimeout" xml:space="preserve">
+    <value>Не удалось прочитать тайм-аут очистки потоков из файла конфигурации</value>
+  </data>
   <data name="FailedToReadElasticConnectionString" xml:space="preserve">
     <value>Не удалось прочитать строку подключения к ElasticSearch</value>
   </data>
   <data name="FailedToReadRedisConnectionString" xml:space="preserve">
     <value>Не удалось прочитать строку подключения к Redis</value>
+  </data>
+  <data name="FailedToReadStreamTTL" xml:space="preserve">
+    <value>Не удалось прочитать время жизни пакета в потоке из файла конфигурации</value>
   </data>
   <data name="NoAgentsWereFound" xml:space="preserve">
     <value>Не удалось получить агентов. Вероятно, ни один из агентов не взаимодействует с Redis и его потоками. Проверьте работу службы на устройствах</value>

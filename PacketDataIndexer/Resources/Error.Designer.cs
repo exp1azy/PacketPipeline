@@ -61,6 +61,15 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать тайм-аут очистки потоков из файла конфигурации.
+        /// </summary>
+        internal static string FailedToReadClearTimeout {
+            get {
+                return ResourceManager.GetString("FailedToReadClearTimeout", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Ищет локализованную строку, похожую на Не удалось прочитать строку подключения к ElasticSearch.
         /// </summary>
         internal static string FailedToReadElasticConnectionString {
@@ -75,6 +84,15 @@ namespace PacketDataIndexer.Resources {
         internal static string FailedToReadRedisConnectionString {
             get {
                 return ResourceManager.GetString("FailedToReadRedisConnectionString", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать время жизни пакета в потоке из файла конфигурации.
+        /// </summary>
+        internal static string FailedToReadStreamTTL {
+            get {
+                return ResourceManager.GetString("FailedToReadStreamTTL", resourceCulture);
             }
         }
         

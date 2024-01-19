@@ -19,6 +19,17 @@ namespace PacketTests
         }
 
         [Fact]
+        public void GenerateAndExtractUdpTest()
+        {
+            var bytes = GenerateUDP();
+            var packet = Packet.ParsePacket(LinkLayers.Ethernet, bytes);
+            var extractedPacket = GetTransport(packet);
+
+            Assert.NotNull(extractedPacket);
+            Assert.True(extractedPacket.GetType() == typeof(UdpPacket));
+        }
+
+        [Fact]
         public void GenerateAndExtractIcmpTest()
         {
             var bytes = GenerateICMPv4();
@@ -71,6 +82,24 @@ namespace PacketTests
             var ipPacket = GetIP();
 
             ipPacket.PayloadPacket = tcpPacket;
+            ethernetPacket.PayloadPacket = ipPacket;
+
+            return ethernetPacket.Bytes;
+        }
+
+        private byte[] GenerateUDP()
+        {
+            var rand = new Random();
+
+            var udpPacket = new UdpPacket((ushort)rand.Next(ushort.MinValue, ushort.MaxValue), (ushort)rand.Next(ushort.MinValue, ushort.MaxValue));
+            byte[] data = new byte[10];
+            rand.NextBytes(data);
+            udpPacket.PayloadData = data;
+
+            var ethernetPacket = GetEthernet();
+            var ipPacket = GetIP();
+
+            ipPacket.PayloadPacket = udpPacket;
             ethernetPacket.PayloadPacket = ipPacket;
 
             return ethernetPacket.Bytes;

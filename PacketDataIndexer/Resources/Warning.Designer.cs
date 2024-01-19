@@ -61,15 +61,6 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось извлечь протокол: {0}.
-        /// </summary>
-        internal static string FailedToExtractProtocol {
-            get {
-                return ResourceManager.GetString("FailedToExtractProtocol", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Ищет локализованную строку, похожую на Не удалось прочитать из файла конфигурации индекс первого актуального значения в потоке Redis. Установлено значение &quot;0&quot;.
         /// </summary>
         internal static string FailedToReadLastRedisValueIndex {
