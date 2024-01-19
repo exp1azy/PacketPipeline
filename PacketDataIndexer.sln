@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34330.188
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PacketDataIndexer", "PacketDataIndexer\PacketDataIndexer.csproj", "{CEB02BE2-5F9B-4857-9D94-FA917364402D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PacketTests", "PacketTests\PacketTests.csproj", "{245EA346-873D-4C83-BDAB-3ED242E2AC1E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CEB02BE2-5F9B-4857-9D94-FA917364402D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CEB02BE2-5F9B-4857-9D94-FA917364402D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CEB02BE2-5F9B-4857-9D94-FA917364402D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CEB02BE2-5F9B-4857-9D94-FA917364402D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{245EA346-873D-4C83-BDAB-3ED242E2AC1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{245EA346-873D-4C83-BDAB-3ED242E2AC1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{245EA346-873D-4C83-BDAB-3ED242E2AC1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{245EA346-873D-4C83-BDAB-3ED242E2AC1E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {285577B7-602D-4E61-8948-20466F7CF23C}
+	EndGlobalSection
+EndGlobal
