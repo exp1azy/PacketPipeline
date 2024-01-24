@@ -1,11 +1,12 @@
 ﻿using Nest;
 using Newtonsoft.Json;
 using PacketDataIndexer.Entities;
-using PacketDataIndexer.Entities.Deserialized.RawPacket;
-using PacketDataIndexer.Entities.Deserialized.Statistics;
+using PacketDataIndexer.Entities.RawPacket;
+using PacketDataIndexer.Entities.Statistics;
 using PacketDataIndexer.Resources;
 using PacketDotNet;
 using StackExchange.Redis;
+using System.Collections.Concurrent;
 
 namespace PacketDataIndexer
 {
@@ -24,6 +25,10 @@ namespace PacketDataIndexer
         private Task? _elasticTask;
         private Task? _clearingTask;
 
+        private ConcurrentQueue<PacketsDocument> _packetsQueue;
+        private ConcurrentQueue<StatisticsDocument> _statisticsQueue;
+        private int _maxQueueSize;
+
         /// <summary>
         /// Конструктор.
         /// </summary>
@@ -40,6 +45,20 @@ namespace PacketDataIndexer
                 _logger.LogError(Error.FailedToReadRedisConnectionString);
                 Environment.Exit(1);
             }
+
+            if (int.TryParse(_config["MaxQueueSize"], out int maxQueueSize))
+            {
+                _maxQueueSize = maxQueueSize;
+            }
+            else
+            {
+                _logger.LogError(Error.FailedToReadMaxQueueSize);
+                Environment.Exit(1);
+            }
+
+            _packetsQueue = new ConcurrentQueue<PacketsDocument>();
+            _statisticsQueue = new ConcurrentQueue<StatisticsDocument>();
+
             _redisTask = Task.Run(async () =>
             {
                 while (true)
@@ -230,14 +249,34 @@ namespace PacketDataIndexer
                 };
             }
 
-            
+            if (_packetsQueue.Count < _maxQueueSize)
+            {
+                _packetsQueue.Enqueue(document);
+            }
+            else
+            {
+                var bulkDescriptor = new BulkDescriptor("packets");
+
+                while (_packetsQueue.TryDequeue(out var d))
+                {
+                    bulkDescriptor.Index<PacketsDocument>(s => s
+                        .Document(d)
+                        .Id(d.Id)
+                    );
+                }
+
+                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
+
+                if (!bulkResponse.IsValid)              
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing);             
+            }
         }
 
         /// <summary>
-        /// 
+        /// Метод, необходимый для индексации статистики.
         /// </summary>
-        /// <param name="statistics"></param>
-        /// <param name="agent"></param>
+        /// <param name="statistics">Экземпляр, представляющий статистику.</param>
+        /// <param name="agent">Агент.</param>
         /// <param name="stoppingToken"></param>
         /// <returns></returns>
         private async Task HandleStatisticsAsync(Statistics statistics, RedisKey agent, CancellationToken stoppingToken)
@@ -248,6 +287,28 @@ namespace PacketDataIndexer
                 Agent = agent.ToString(),
                 Statistics = statistics
             };
+
+            if (_statisticsQueue.Count < _maxQueueSize)
+            {
+                _statisticsQueue.Enqueue(document);
+            }
+            else
+            {
+                var bulkDescriptor = new BulkDescriptor("statistics");
+
+                while (_statisticsQueue.TryDequeue(out var d))
+                {
+                    bulkDescriptor.Index<StatisticsDocument>(s => s
+                        .Document(d)
+                        .Id(d.Id)
+                    );
+                }
+
+                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
+
+                if (!bulkResponse.IsValid)
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing);
+            }
         }
 
         /// <summary>

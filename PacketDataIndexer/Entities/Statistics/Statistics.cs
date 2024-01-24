@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
-using SharpPcap;
 
-namespace PacketDataIndexer.Entities.Deserialized.Statistics
+namespace PacketDataIndexer.Entities.Statistics
 {
     internal class Statistics
     {
@@ -9,7 +8,7 @@ namespace PacketDataIndexer.Entities.Deserialized.Statistics
         public Device Device { get; set; }
 
         [JsonProperty("Timeval")]
-        public PosixTimeval Timeval { get; set; }
+        public Timeval Timeval { get; set; }
 
         [JsonProperty("ReceivedPackets")]
         public long ReceivedPackets { get; set; }

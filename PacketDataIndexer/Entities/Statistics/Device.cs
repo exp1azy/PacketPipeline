@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace PacketDataIndexer.Entities.Deserialized.Statistics
+namespace PacketDataIndexer.Entities.Statistics
 {
     internal class Device
     {

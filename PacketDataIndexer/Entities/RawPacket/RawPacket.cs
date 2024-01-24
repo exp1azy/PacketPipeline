@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using SharpPcap;
 
-namespace PacketDataIndexer.Entities.Deserialized.RawPacket
+namespace PacketDataIndexer.Entities.RawPacket
 {
     internal class RawPacket
     {
@@ -12,7 +12,7 @@ namespace PacketDataIndexer.Entities.Deserialized.RawPacket
         public ushort LinkLayerType { get; set; }
 
         [JsonProperty("Timeval")]
-        public PosixTimeval Timeval { get; set; }
+        public Timeval Timeval { get; set; }
 
         [JsonProperty("PacketLength")]
         public int PacketLength { get; set; }

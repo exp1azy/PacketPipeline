@@ -123,6 +123,9 @@
   <data name="FailedToReadElasticConnectionString" xml:space="preserve">
     <value>Не удалось прочитать строку подключения к ElasticSearch</value>
   </data>
+  <data name="FailedToReadMaxQueueSize" xml:space="preserve">
+    <value>Не удалось прочитать максимальный размер очередей из файла appsettings.json</value>
+  </data>
   <data name="FailedToReadRedisConnectionString" xml:space="preserve">
     <value>Не удалось прочитать строку подключения к Redis</value>
   </data>

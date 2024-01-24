@@ -61,6 +61,15 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
+        ///   Ищет локализованную строку, похожую на Произошла ошибка при индексации данных в ElasticSearch.
+        /// </summary>
+        internal static string AnErrorOccuredWhileIndexing {
+            get {
+                return ResourceManager.GetString("AnErrorOccuredWhileIndexing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Ищет локализованную строку, похожую на Не удалось прочитать из файла конфигурации индекс первого актуального значения в потоке Redis. Установлено значение &quot;0&quot;.
         /// </summary>
         internal static string FailedToReadLastRedisValueIndex {

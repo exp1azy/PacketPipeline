@@ -79,6 +79,15 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать максимальный размер очередей из файла appsettings.json.
+        /// </summary>
+        internal static string FailedToReadMaxQueueSize {
+            get {
+                return ResourceManager.GetString("FailedToReadMaxQueueSize", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Ищет локализованную строку, похожую на Не удалось прочитать строку подключения к Redis.
         /// </summary>
         internal static string FailedToReadRedisConnectionString {
