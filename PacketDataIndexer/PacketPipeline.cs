@@ -1,7 +1,6 @@
 ﻿using Nest;
 using Newtonsoft.Json;
 using PacketDataIndexer.Entities;
-using PacketDataIndexer.Entities.Deserialized;
 using PacketDataIndexer.Entities.Deserialized.RawPacket;
 using PacketDataIndexer.Entities.Deserialized.Statistics;
 using PacketDataIndexer.Resources;
@@ -123,22 +122,18 @@ namespace PacketDataIndexer
                         var streamInfo = await _redisDatabase.StreamInfoAsync(agent);
                         var entries = await _redisDatabase.StreamReadAsync(agent, streamInfo.FirstEntry.Id);
 
-                        var data = GetDeserializedPacketData(entries);
-                        data.Item1.ForEach(async pb =>
+                        var rawPacketData = GetDeserializedRawPacketData(entries);
+                        foreach (var p in rawPacketData)
                         {
-                            foreach (var p in pb.Batch)
-                            {
-                                var packet = Packet.ParsePacket((LinkLayers)p.LinkLayerType, p.Data);
-                                await HandlePacketAsync(packet, agent, stoppingToken);
-                            }
-                        });
-                        data.Item2.ForEach(async sb =>
+                            var packet = Packet.ParsePacket((LinkLayers)p.LinkLayerType, p.Data);
+                            await HandlePacketAsync(packet, agent, stoppingToken);
+                        }
+
+                        var statisticsData = GetDeserializedStatisticsData(entries);
+                        foreach (var s in statisticsData)
                         {
-                            foreach (var s in sb.Batch)
-                            {
-                                //await HandleStatisticsAsync(s, agent, stoppingToken);
-                            }
-                        });
+                            await HandleStatisticsAsync(s, agent, stoppingToken);
+                        }
                     }                   
                 }));
             }
@@ -151,27 +146,31 @@ namespace PacketDataIndexer
         }
 
         /// <summary>
-        /// Метод, необходимый для распаковки и десериализации данных о сети из Redis.
+        /// Метод, необходимый для распаковки и десериализации данных о RawPacket из Redis.
         /// </summary>
-        /// <param name="agent">Список агентов.</param>
-        /// <param name="stoppingToken">Токен остановки.</param>
-        /// <returns>Кортеж, где первым объектом возвращается список <see cref="RawPacket"/>, а вторым список <see cref="Statistics"/></returns>
-        private (List<NetworkData<RawPacket>>, List<NetworkData<Statistics>>) GetDeserializedPacketData(StreamEntry[] entries)
+        /// <returns>Список <see cref="RawPacket"/></returns>
+        private List<RawPacket?> GetDeserializedRawPacketData(StreamEntry[] entries)
+        {
+            var allBatches = entries.Select(e => e.Values.First());
+            var rawPackets = allBatches.Where(v => v.Name.StartsWith("raw_packets"));
+
+            var rawPacketBatches = rawPackets.Select(b => JsonConvert.DeserializeObject<RawPacket>(b.Value.ToString())).ToList();       
+
+            return rawPacketBatches;
+        }
+
+        /// <summary>
+        /// Метод, необходимый для распаковки и десериализации данных о Statistics из Redis.
+        /// </summary>
+        /// <returns>Список <see cref="Statistics"/></returns>
+        private List<Statistics?> GetDeserializedStatisticsData(StreamEntry[] entries)
         {
             var allBatches = entries.Select(e => e.Values.First());
             var statistics = allBatches.Where(v => v.Name.StartsWith("statistics"));
-            var rawPackets = allBatches.Where(v => v.Name.StartsWith("raw_packets"));
 
-            var rawPacketBatches = rawPackets.Select(b => new NetworkData<RawPacket>
-            {
-                Batch = JsonConvert.DeserializeObject<List<RawPacket>>(b.Value.ToString())!
-            }).ToList();
-            var statisticsBatches = statistics.Select(b => new NetworkData<Statistics>
-            {
-                Batch = JsonConvert.DeserializeObject<List<Statistics>>(b.Value.ToString())!
-            }).ToList();            
+            var statisticsBatches = statistics.Select(b => JsonConvert.DeserializeObject<Statistics>(b.Value.ToString())).ToList();
 
-            return (rawPacketBatches, statisticsBatches);
+            return statisticsBatches;
         }
 
         /// <summary>
@@ -183,7 +182,7 @@ namespace PacketDataIndexer
         /// <returns></returns>
         private async Task HandlePacketAsync(Packet packet, RedisKey agent, CancellationToken stoppingToken)
         {
-            Document document;
+            PacketsDocument document;
 
             var transport = GetTransport(packet);
             var network = GetNetwork(packet);
@@ -194,7 +193,7 @@ namespace PacketDataIndexer
             }
             else if (transport == null)
             {
-                document = new Document
+                document = new PacketsDocument
                 {
                     Id = Guid.NewGuid(),
                     Agent = agent.ToString(),
@@ -207,7 +206,7 @@ namespace PacketDataIndexer
             }
             else if (network == null)
             {
-                document = new Document
+                document = new PacketsDocument
                 {
                     Id = Guid.NewGuid(),
                     Agent = agent.ToString(),
@@ -217,7 +216,7 @@ namespace PacketDataIndexer
             }
             else
             {
-                document = new Document
+                document = new PacketsDocument
                 {
                     Id = Guid.NewGuid(),
                     Agent = agent.ToString(),
@@ -231,7 +230,24 @@ namespace PacketDataIndexer
                 };
             }
 
-            //todo: es
+            
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="statistics"></param>
+        /// <param name="agent"></param>
+        /// <param name="stoppingToken"></param>
+        /// <returns></returns>
+        private async Task HandleStatisticsAsync(Statistics statistics, RedisKey agent, CancellationToken stoppingToken)
+        {
+            var document = new StatisticsDocument
+            {
+                Id = Guid.NewGuid(),
+                Agent = agent.ToString(),
+                Statistics = statistics
+            };
         }
 
         /// <summary>
@@ -283,12 +299,22 @@ namespace PacketDataIndexer
                 {
                     var streamInfo = await _redisDatabase.StreamInfoAsync(agent);
                     var entries = await _redisDatabase.StreamReadAsync(agent, streamInfo.FirstEntry.Id);
-                    //var itemsToDelete = entries.Where(e =>
-                    //{
-                    //    var deserialized = GetDeserializedPacketData(entries);
-                    //    return deserialized.Item1.Timeval.Date + TimeSpan.FromHours((double)ttl) > DateTime.UtcNow;
-                    //}).Select(e => e.Id).ToArray();
-                    //await _redisDatabase.StreamDeleteAsync(agent, itemsToDelete);
+
+                     var rawPacketsToDelete = entries
+                        .Where(e => e.Values.First().Name.StartsWith("raw_packets"))
+                        .Where(e => JsonConvert.DeserializeObject<RawPacket>(e.Values.First().Value.ToString()).Timeval.Date + TimeSpan.FromHours((double)ttl) < DateTime.UtcNow)
+                        .Select(e => e.Id)
+                        .ToArray();
+                    if (rawPacketsToDelete.Any())
+                        _ = _redisDatabase.StreamDeleteAsync(agent, rawPacketsToDelete);
+
+                    var statisticsToDelete = entries
+                        .Where(e => e.Values.First().Name.StartsWith("statistics"))
+                        .Where(e => JsonConvert.DeserializeObject<Statistics>(e.Values.First().Value.ToString()).Timeval.Date + TimeSpan.FromHours((double)ttl) < DateTime.UtcNow)
+                        .Select(e => e.Id)  
+                        .ToArray();
+                    if (statisticsToDelete.Any())
+                        _ = _redisDatabase.StreamDeleteAsync(agent, statisticsToDelete);
                 }
             }           
         }
@@ -312,11 +338,9 @@ namespace PacketDataIndexer
                 Environment.Exit(1);
             }
 
-            foreach (var key in server!.Keys(pattern: "host_*"))
-            {
+            foreach (var key in server!.Keys(pattern: "host_*"))           
                 agents.Add(new RedisKey(key));
-            }
-            
+                       
             return agents;
         }
 
@@ -324,7 +348,9 @@ namespace PacketDataIndexer
         {
             base.Dispose();
 
-            _redisConnection!.Close();
+            if (_redisConnection!.IsConnected)
+                _redisConnection!.Close();
+
             _redisConnection.Dispose();
             _redisConnection = null;
 

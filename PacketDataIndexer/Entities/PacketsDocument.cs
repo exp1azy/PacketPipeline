@@ -2,7 +2,7 @@
 
 namespace PacketDataIndexer.Entities
 {
-    internal class Document
+    internal class PacketsDocument
     {
         public Guid Id { get; set; }
 
