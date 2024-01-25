@@ -118,22 +118,22 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="FailedToReadClearTimeout" xml:space="preserve">
-    <value>Не удалось прочитать тайм-аут очистки потоков из файла конфигурации</value>
+    <value>Не удалось прочитать ClearTimeout из файла конфигурации</value>
   </data>
   <data name="FailedToReadElasticConnectionString" xml:space="preserve">
-    <value>Не удалось прочитать строку подключения к ElasticSearch</value>
+    <value>Не удалось прочитать ESConnectionString из файла конфигурации</value>
+  </data>
+  <data name="FailedToReadESAuthParams" xml:space="preserve">
+    <value>Не удалось прочитать ESAuthParams из файла конфигурации</value>
   </data>
   <data name="FailedToReadMaxQueueSize" xml:space="preserve">
-    <value>Не удалось прочитать максимальный размер очередей из файла appsettings.json</value>
+    <value>Не удалось прочитать MaxQueueSize из файла appsettings.json</value>
   </data>
   <data name="FailedToReadRedisConnectionString" xml:space="preserve">
-    <value>Не удалось прочитать строку подключения к Redis</value>
+    <value>Не удалось прочитать RedisConnectionString из файла конфигурации</value>
   </data>
   <data name="FailedToReadStreamTTL" xml:space="preserve">
-    <value>Не удалось прочитать время жизни пакета в потоке из файла конфигурации</value>
-  </data>
-  <data name="NoAgentsWereFound" xml:space="preserve">
-    <value>Не удалось получить агентов. Вероятно, ни один из агентов не взаимодействует с Redis и его потоками. Проверьте работу службы на устройствах</value>
+    <value>Не удалось прочитать StreamTTL из файла конфигурации</value>
   </data>
   <data name="NoConnectionToElastic" xml:space="preserve">
     <value>Не удалось установить соединение с ElasticSearch</value>
@@ -143,5 +143,8 @@
   </data>
   <data name="NoConnectionToRedisServer" xml:space="preserve">
     <value>Не удалось установить соединение с сервером Redis</value>
+  </data>
+  <data name="Unexpected" xml:space="preserve">
+    <value>Произошла непредвиденная ошибка: {0}</value>
   </data>
 </root>

@@ -61,7 +61,7 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Произошла ошибка при индексации данных в ElasticSearch.
+        ///   Ищет локализованную строку, похожую на Произошла ошибка при индексации данных в ElasticSearch: {0}.
         /// </summary>
         internal static string AnErrorOccuredWhileIndexing {
             get {
@@ -70,11 +70,29 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать из файла конфигурации индекс первого актуального значения в потоке Redis. Установлено значение &quot;0&quot;.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать LastRedisValueIndex из файла конфигурации. Установлено значение &quot;0&quot;.
         /// </summary>
         internal static string FailedToReadLastRedisValueIndex {
             get {
                 return ResourceManager.GetString("FailedToReadLastRedisValueIndex", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamCount из файла конфигурации. Установлено значение &quot;500&quot;.
+        /// </summary>
+        internal static string FailedToReadStreamCount {
+            get {
+                return ResourceManager.GetString("FailedToReadStreamCount", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось получить агентов. Вероятно, ни один из агентов не взаимодействует с Redis и его потоками. Проверьте работу службы на устройствах.
+        /// </summary>
+        internal static string NoAgentsWereFound {
+            get {
+                return ResourceManager.GetString("NoAgentsWereFound", resourceCulture);
             }
         }
     }

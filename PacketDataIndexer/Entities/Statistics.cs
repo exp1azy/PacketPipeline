@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace PacketDataIndexer.Entities.Statistics
+namespace PacketDataIndexer.Entities
 {
     internal class Statistics
     {

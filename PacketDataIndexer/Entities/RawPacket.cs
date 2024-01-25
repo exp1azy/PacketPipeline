@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
-using SharpPcap;
 
-namespace PacketDataIndexer.Entities.RawPacket
+namespace PacketDataIndexer.Entities
 {
     internal class RawPacket
     {

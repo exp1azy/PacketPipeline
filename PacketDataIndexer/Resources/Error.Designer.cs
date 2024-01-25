@@ -61,7 +61,7 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать тайм-аут очистки потоков из файла конфигурации.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать ClearTimeout из файла конфигурации.
         /// </summary>
         internal static string FailedToReadClearTimeout {
             get {
@@ -70,7 +70,7 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать строку подключения к ElasticSearch.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать ESConnectionString из файла конфигурации.
         /// </summary>
         internal static string FailedToReadElasticConnectionString {
             get {
@@ -79,7 +79,16 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать максимальный размер очередей из файла appsettings.json.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать ESAuthParams из файла конфигурации.
+        /// </summary>
+        internal static string FailedToReadESAuthParams {
+            get {
+                return ResourceManager.GetString("FailedToReadESAuthParams", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать MaxQueueSize из файла appsettings.json.
         /// </summary>
         internal static string FailedToReadMaxQueueSize {
             get {
@@ -88,7 +97,7 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать строку подключения к Redis.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать RedisConnectionString из файла конфигурации.
         /// </summary>
         internal static string FailedToReadRedisConnectionString {
             get {
@@ -97,20 +106,11 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать время жизни пакета в потоке из файла конфигурации.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamTTL из файла конфигурации.
         /// </summary>
         internal static string FailedToReadStreamTTL {
             get {
                 return ResourceManager.GetString("FailedToReadStreamTTL", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось получить агентов. Вероятно, ни один из агентов не взаимодействует с Redis и его потоками. Проверьте работу службы на устройствах.
-        /// </summary>
-        internal static string NoAgentsWereFound {
-            get {
-                return ResourceManager.GetString("NoAgentsWereFound", resourceCulture);
             }
         }
         
@@ -138,6 +138,15 @@ namespace PacketDataIndexer.Resources {
         internal static string NoConnectionToRedisServer {
             get {
                 return ResourceManager.GetString("NoConnectionToRedisServer", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Произошла непредвиденная ошибка: {0}.
+        /// </summary>
+        internal static string Unexpected {
+            get {
+                return ResourceManager.GetString("Unexpected", resourceCulture);
             }
         }
     }

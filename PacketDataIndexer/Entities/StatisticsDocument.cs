@@ -1,6 +1,4 @@
-﻿using PacketDataIndexer.Entities.Deserialized.Statistics;
-
-namespace PacketDataIndexer.Entities
+﻿namespace PacketDataIndexer.Entities
 {
     internal class StatisticsDocument
     {

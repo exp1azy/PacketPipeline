@@ -1,12 +1,12 @@
-﻿using Nest;
+﻿using Elasticsearch.Net;
+using Nest;
 using Newtonsoft.Json;
 using PacketDataIndexer.Entities;
-using PacketDataIndexer.Entities.RawPacket;
-using PacketDataIndexer.Entities.Statistics;
 using PacketDataIndexer.Resources;
 using PacketDotNet;
 using StackExchange.Redis;
 using System.Collections.Concurrent;
+using Error = PacketDataIndexer.Resources.Error;
 
 namespace PacketDataIndexer
 {
@@ -39,12 +39,34 @@ namespace PacketDataIndexer
             _config = config;
             _logger = logger;
 
-            var connectionString = _config.GetSection("ConnectionStrings");
-            if (connectionString["RedisConnection"] == null)
+            var redisConnection = _config.GetConnectionString("RedisConnection");
+            if (string.IsNullOrEmpty(redisConnection))
             {
                 _logger.LogError(Error.FailedToReadRedisConnectionString);
                 Environment.Exit(1);
             }
+
+            _redisTask = Task.Run(() => ConnectToRedisAsync(redisConnection));
+
+            var elasticConnection = _config.GetConnectionString("ElasticConnection");
+            if (string.IsNullOrEmpty(elasticConnection))
+            {
+                _logger?.LogError(Error.FailedToReadElasticConnectionString);
+                Environment.Exit(1);
+            }
+
+            var authParams = _config.GetSection("ElasticSearchAuth");
+            if (string.IsNullOrEmpty(authParams["Username"]) || string.IsNullOrEmpty(authParams["Password"]))
+            {
+                _logger.LogError(Error.FailedToReadESAuthParams);
+                Environment.Exit(1);
+            }
+
+            _elasticTask = Task.Run(() => ConnectToElasticSearchAsync(
+                elasticConnection!,
+                authParams["Username"]!, 
+                authParams["Password"]!)
+            );
 
             if (int.TryParse(_config["MaxQueueSize"], out int maxQueueSize))
             {
@@ -58,47 +80,58 @@ namespace PacketDataIndexer
 
             _packetsQueue = new ConcurrentQueue<PacketsDocument>();
             _statisticsQueue = new ConcurrentQueue<StatisticsDocument>();
+        }
 
-            _redisTask = Task.Run(async () =>
+        /// <summary>
+        /// Подключение к серверу Redis.
+        /// </summary>
+        /// <param name="connectionString">Строка подключения.</param>
+        /// <returns></returns>
+        private async Task ConnectToRedisAsync(string connectionString)
+        {         
+            while (true)
             {
-                while (true)
+                try
                 {
-                    try
-                    {
-                        _redisConnection = ConnectionMultiplexer.Connect(connectionString["RedisConnection"]!);
-                        _redisDatabase = _redisConnection.GetDatabase();
-                        break;
-                    }
-                    catch
-                    {
-                        _logger.LogError(Error.NoConnectionToRedis);
-                        await Task.Delay(2000);
-                    }
+                    _redisConnection = ConnectionMultiplexer.Connect(connectionString);
+                    _redisDatabase = _redisConnection.GetDatabase();
+                    break;
                 }
-            });
+                catch
+                {
+                    _logger.LogError(Error.NoConnectionToRedis);
+                    await Task.Delay(5000);
+                }
+            }
+        }
 
-            //if (connectionString["ElasticClient"] == null)
-            //{
-            //    _logger?.LogError(Error.FailedToReadElasticConnectionString);
-            //    Environment.Exit(1);
-            //}
-            _elasticTask = Task.Run(async () =>
+        /// <summary>
+        /// Подключение к серверу ElasticSearch.
+        /// </summary>
+        /// <param name="connectionString">Строка подключения.</param>
+        /// <param name="username">Имя пользователя.</param>
+        /// <param name="password">Пароль.</param>
+        /// <returns></returns>
+        private async Task ConnectToElasticSearchAsync(string connectionString, string username, string password)
+        {
+            while (true)
             {
-                //while (true)
-                //{
-                //    try
-                //    {
-                //        var settings = new ConnectionSettings(new Uri(connectionString["ElasticConnection"]!));
-                //        _elasticClient = new ElasticClient(settings);
-                //        break;
-                //    }
-                //    catch
-                //    {
-                //        _logger.LogError(Error.NoConnectionToElastic);
-                //        await Task.Delay(2000);
-                //    }
-                //}
-            });
+                try
+                {
+                    var settings = new ConnectionSettings(new Uri(connectionString))
+                        .BasicAuthentication(username, password)
+                        .ServerCertificateValidationCallback((o, certificate, chain, errors) => true)
+                        .ServerCertificateValidationCallback(CertificateValidations.AllowAll)
+                        .DisableDirectStreaming();
+                    _elasticClient = new ElasticClient(settings);
+                    break;
+                }
+                catch
+                {
+                    _logger.LogError(Error.NoConnectionToElastic);
+                    await Task.Delay(5000);
+                }
+            }
         }
 
         /// <summary>
@@ -117,7 +150,7 @@ namespace PacketDataIndexer
                 {
                     stoppingToken.ThrowIfCancellationRequested();
 
-                    _logger.LogError(Error.NoAgentsWereFound);
+                    _logger.LogWarning(Warning.NoAgentsWereFound);
                     await Task.Delay(10000);
                     agents = GetRedisKeys();
                 }
@@ -128,6 +161,12 @@ namespace PacketDataIndexer
                 }                            
             }
 
+            int streamCount = 500;
+            if (!int.TryParse(_config["StreamCount"], out streamCount))
+            {
+                _logger.LogWarning(Warning.FailedToReadStreamCount);
+            }
+                   
             _clearingTask = Task.Run(() => ClearRedisStreamAsync(agents, stoppingToken));
 
             var tasks = new List<Task>();
@@ -135,23 +174,38 @@ namespace PacketDataIndexer
             foreach (var agent in agents)
             {
                 tasks.Add(Task.Run(async () =>
-                {
+                {                 
+                    var offset = StreamPosition.Beginning;
                     while (!stoppingToken.IsCancellationRequested)
                     {
-                        var streamInfo = await _redisDatabase.StreamInfoAsync(agent);
-                        var entries = await _redisDatabase.StreamReadAsync(agent, streamInfo.FirstEntry.Id);
-
-                        var rawPacketData = GetDeserializedRawPacketData(entries);
-                        foreach (var p in rawPacketData)
+                        try
                         {
-                            var packet = Packet.ParsePacket((LinkLayers)p.LinkLayerType, p.Data);
-                            await HandlePacketAsync(packet, agent, stoppingToken);
+                            var entries = await _redisDatabase.StreamReadAsync(agent, offset, streamCount);
+
+                            var rawPacketData = GetDeserializedRawPacketData(entries);
+                            foreach (var p in rawPacketData)
+                            {
+                                var packet = Packet.ParsePacket((LinkLayers)p.LinkLayerType, p.Data);
+                                await HandlePacketAsync(packet, agent, stoppingToken);
+                            }
+
+                            var statisticsData = GetDeserializedStatisticsData(entries);
+                            foreach (var s in statisticsData)
+                            {
+                                await HandleStatisticsAsync(s, agent, stoppingToken);
+                            }
+
+                            offset = entries.Last().Id;
                         }
-
-                        var statisticsData = GetDeserializedStatisticsData(entries);
-                        foreach (var s in statisticsData)
+                        catch (RedisConnectionException)
                         {
-                            await HandleStatisticsAsync(s, agent, stoppingToken);
+                            await ConnectToRedisAsync(_config.GetConnectionString("RedisConnection")!);
+                        }
+                        catch (Exception ex)
+                        {
+                            Dispose();
+                            _logger.LogError(Error.Unexpected, ex.Message);
+                            Environment.Exit(1);
                         }
                     }                   
                 }));
@@ -171,11 +225,11 @@ namespace PacketDataIndexer
         private List<RawPacket?> GetDeserializedRawPacketData(StreamEntry[] entries)
         {
             var allBatches = entries.Select(e => e.Values.First());
-            var rawPackets = allBatches.Where(v => v.Name.StartsWith("raw_packets"));
+            var rawPacketsBatches = allBatches.Where(v => v.Name.StartsWith("raw_packets"));
 
-            var rawPacketBatches = rawPackets.Select(b => JsonConvert.DeserializeObject<RawPacket>(b.Value.ToString())).ToList();       
+            var rawPackets = rawPacketsBatches.Select(b => JsonConvert.DeserializeObject<RawPacket>(b.Value.ToString())).ToList();       
 
-            return rawPacketBatches;
+            return rawPackets;
         }
 
         /// <summary>
@@ -185,26 +239,26 @@ namespace PacketDataIndexer
         private List<Statistics?> GetDeserializedStatisticsData(StreamEntry[] entries)
         {
             var allBatches = entries.Select(e => e.Values.First());
-            var statistics = allBatches.Where(v => v.Name.StartsWith("statistics"));
+            var statisticsBatches = allBatches.Where(v => v.Name.StartsWith("statistics"));
 
-            var statisticsBatches = statistics.Select(b => JsonConvert.DeserializeObject<Statistics>(b.Value.ToString())).ToList();
+            var statistics = statisticsBatches.Select(b => JsonConvert.DeserializeObject<Statistics>(b.Value.ToString())).ToList();
 
-            return statisticsBatches;
+            return statistics;
         }
 
         /// <summary>
-        /// Метод, необходимый для извлечения пакетов и передачи его в индекс ES.
+        /// Метод, необходимый для индексации пакетов.
         /// </summary>
-        /// <param name="packet"></param>
-        /// <param name="agent"></param>
-        /// <param name="stoppingToken"></param>
+        /// <param name="packet">Пакет.</param>
+        /// <param name="agent">Агент.</param>
+        /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
         private async Task HandlePacketAsync(Packet packet, RedisKey agent, CancellationToken stoppingToken)
         {
             PacketsDocument document;
 
-            var transport = GetTransport(packet);
-            var network = GetNetwork(packet);
+            object? transport = GetTransport(packet);
+            object? network = GetNetwork(packet);
 
             if (network == null && transport == null)
             {
@@ -267,17 +321,17 @@ namespace PacketDataIndexer
 
                 var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
 
-                if (!bulkResponse.IsValid)              
-                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing);             
+                if (!bulkResponse.IsValid)
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
             }
         }
 
         /// <summary>
         /// Метод, необходимый для индексации статистики.
         /// </summary>
-        /// <param name="statistics">Экземпляр, представляющий статистику.</param>
+        /// <param name="statistics">Статистика.</param>
         /// <param name="agent">Агент.</param>
-        /// <param name="stoppingToken"></param>
+        /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
         private async Task HandleStatisticsAsync(Statistics statistics, RedisKey agent, CancellationToken stoppingToken)
         {
@@ -307,7 +361,7 @@ namespace PacketDataIndexer
                 var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
 
                 if (!bulkResponse.IsValid)
-                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing);
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
             }
         }
 
@@ -381,7 +435,7 @@ namespace PacketDataIndexer
         }
 
         /// <summary>
-        /// Метод, получающий агентов из сервера Redis.
+        /// Метод, возвращающий агентов из сервера Redis.
         /// </summary>
         /// <returns>Список ключей.</returns>
         private List<RedisKey> GetRedisKeys()
