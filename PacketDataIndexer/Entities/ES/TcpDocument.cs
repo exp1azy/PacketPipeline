@@ -55,14 +55,14 @@ namespace PacketDataIndexer.Entities.ES
     {
         public byte[] Bytes { get; set; }
 
-        public OptionTypes Kind { get; set; }
+        public string Kind { get; set; }
 
         public byte Length { get; set; }
 
         public static explicit operator TcpOption(PacketDotNet.Tcp.TcpOption option) => new TcpOption
         {
             Bytes = option.Bytes,
-            Kind = option.Kind,
+            Kind = option.Kind.ToString(),
             Length = option.Length,
         };     
     } 

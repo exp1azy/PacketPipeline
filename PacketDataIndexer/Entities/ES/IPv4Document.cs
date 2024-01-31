@@ -1,11 +1,8 @@
-﻿using PacketDotNet;
-using System.Net;
-
-namespace PacketDataIndexer.Entities.ES
+﻿namespace PacketDataIndexer.Entities.ES
 {
     internal class IPv4Document : BasePacketDocument
     {
-        public IPAddress DestinationAddress { get; set; }
+        public string DestinationAddress { get; set; }
 
         public int HeaderLength { get; set; }
 
@@ -13,15 +10,15 @@ namespace PacketDataIndexer.Entities.ES
 
         public ushort PayloadLength { get; set; }
 
-        public ProtocolType Protocol { get; set; }
+        public string Protocol { get; set; }
 
-        public IPAddress SourceAddress { get; set; }
+        public string SourceAddress { get; set; }
 
         public int TimeToLive { get; set; }
 
         public int TotalLength { get; set; }
 
-        public IPVersion Version { get; set; }
+        public string Version { get; set; }
 
         public ushort Checksum { get; set; }
 

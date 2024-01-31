@@ -1,6 +1,4 @@
-﻿using PacketDotNet;
-
-namespace PacketDataIndexer.Entities.ES
+﻿namespace PacketDataIndexer.Entities.ES
 {
     internal class IcmpV4Document : BasePacketDocument
     {
@@ -12,7 +10,7 @@ namespace PacketDataIndexer.Entities.ES
 
         public ushort Sequence { get; set; }
 
-        public IcmpV4TypeCode TypeCode { get; set; }
+        public string TypeCode { get; set; }
 
         public bool ValidIcmpChecksum { get; set; }
     }
