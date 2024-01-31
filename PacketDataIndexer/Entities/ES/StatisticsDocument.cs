@@ -1,4 +1,4 @@
-﻿namespace PacketDataIndexer.Entities
+﻿namespace PacketDataIndexer.Entities.ES
 {
     internal class StatisticsDocument
     {

@@ -2,16 +2,18 @@
 using Nest;
 using Newtonsoft.Json;
 using PacketDataIndexer.Entities;
+using PacketDataIndexer.Entities.ES;
 using PacketDataIndexer.Resources;
 using PacketDotNet;
 using StackExchange.Redis;
 using System.Collections.Concurrent;
 using Error = PacketDataIndexer.Resources.Error;
+using IPv6ExtensionHeader = PacketDataIndexer.Entities.ES.IPv6ExtensionHeader;
 
 namespace PacketDataIndexer
 {
     /// <summary>
-    /// Класс, представляющий конвейер пакетов.
+    /// Конвейер пакетов.
     /// </summary>
     internal class PacketPipeline : BackgroundService
     {
@@ -25,7 +27,7 @@ namespace PacketDataIndexer
         private Task? _elasticTask;
         private Task? _clearingTask;
 
-        private ConcurrentQueue<PacketsDocument> _packetsQueue;
+        private ConcurrentQueue<BasePacketDocument> _packetsQueue;
         private ConcurrentQueue<StatisticsDocument> _statisticsQueue;
         private int _maxQueueSize;
 
@@ -78,7 +80,7 @@ namespace PacketDataIndexer
                 Environment.Exit(1);
             }
 
-            _packetsQueue = new ConcurrentQueue<PacketsDocument>();
+            _packetsQueue = new ConcurrentQueue<BasePacketDocument>();
             _statisticsQueue = new ConcurrentQueue<StatisticsDocument>();
         }
 
@@ -192,7 +194,7 @@ namespace PacketDataIndexer
                             var statisticsData = GetDeserializedStatisticsData(entries);
                             foreach (var s in statisticsData)
                             {
-                                await HandleStatisticsAsync(s, agent, stoppingToken);
+                                await HandleStatisticsAsync(s!, agent, stoppingToken);
                             }
 
                             offset = entries.Last().Id;
@@ -255,75 +257,55 @@ namespace PacketDataIndexer
         /// <returns></returns>
         private async Task HandlePacketAsync(Packet packet, RedisKey agent, CancellationToken stoppingToken)
         {
-            PacketsDocument document;
-
             object? transport = GetTransport(packet);
             object? network = GetNetwork(packet);
 
-            if (network == null && transport == null)
+            if (network == null && transport == null) return;
+            
+            Guid? transportId = transport == null ? null : Guid.NewGuid();
+            Guid? networkId = network == null ? null : Guid.NewGuid();
+            
+            if (network != null)
             {
-                return;
-            }
-            else if (transport == null)
-            {
-                document = new PacketsDocument
+                if (network is IPv4Packet)
                 {
-                    Id = Guid.NewGuid(),
-                    Agent = agent.ToString(),
-                    IcmpV4Packet = network.GetType() == typeof(IcmpV4Packet) ? (IcmpV4Packet)network : null,
-                    IcmpV6Packet = network.GetType() == typeof(IcmpV6Packet) ? (IcmpV6Packet)network : null,
-                    IgmpV2Packet = network.GetType() == typeof(IgmpV2Packet) ? (IgmpV2Packet)network : null,
-                    IPv4Packet = network.GetType() == typeof(IPv4Packet) ? (IPv4Packet)network : null,
-                    IPv6Packet = network.GetType() == typeof(IPv6Packet) ? (IPv6Packet)network : null,
-                };
-            }
-            else if (network == null)
-            {
-                document = new PacketsDocument
-                {
-                    Id = Guid.NewGuid(),
-                    Agent = agent.ToString(),
-                    TcpPacket = transport.GetType() == typeof(TcpPacket) ? (TcpPacket)transport : null,
-                    UdpPacket = transport.GetType() == typeof(UdpPacket) ? (UdpPacket)transport : null
-                };
-            }
-            else
-            {
-                document = new PacketsDocument
-                {
-                    Id = Guid.NewGuid(),
-                    Agent = agent.ToString(),
-                    TcpPacket = transport.GetType() == typeof(TcpPacket) ? (TcpPacket)transport : null,
-                    UdpPacket = transport.GetType() == typeof(UdpPacket) ? (UdpPacket)transport : null,
-                    IcmpV4Packet = network.GetType() == typeof(IcmpV4Packet) ? (IcmpV4Packet)network : null,
-                    IcmpV6Packet = network.GetType() == typeof(IcmpV6Packet) ? (IcmpV6Packet)network : null,
-                    IgmpV2Packet = network.GetType() == typeof(IgmpV2Packet) ? (IgmpV2Packet)network : null,
-                    IPv4Packet = network.GetType() == typeof(IPv4Packet) ? (IPv4Packet)network : null,
-                    IPv6Packet = network.GetType() == typeof(IPv6Packet) ? (IPv6Packet)network : null,
-                };
-            }
-
-            if (_packetsQueue.Count < _maxQueueSize)
-            {
-                _packetsQueue.Enqueue(document);
-            }
-            else
-            {
-                var bulkDescriptor = new BulkDescriptor("packets");
-
-                while (_packetsQueue.TryDequeue(out var d))
-                {
-                    bulkDescriptor.Index<PacketsDocument>(s => s
-                        .Document(d)
-                        .Id(d.Id)
-                    );
+                    IPv4Packet ipv4 = (IPv4Packet)network;
+                    await GenerateAndIndexIPv4DocAsync((Guid)networkId!, transportId, agent, ipv4, stoppingToken);
                 }
-
-                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
-
-                if (!bulkResponse.IsValid)
-                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
+                if (network is IPv6Packet)
+                {
+                    IPv6Packet ipv6 = (IPv6Packet)network;
+                    await GenerateAndIndexIPv6DocAsync((Guid)networkId!, transportId, agent, ipv6, stoppingToken);
+                }
+                if (network is IcmpV4Packet)
+                {
+                    IcmpV4Packet icmpv4 = (IcmpV4Packet)network;
+                    await GenerateAndIndexIcmpV4DocAsync((Guid)networkId!, transportId, agent, icmpv4, stoppingToken);
+                }
+                if (network is IcmpV6Packet)
+                {
+                    IcmpV6Packet icmpv6 = (IcmpV6Packet)network;
+                    await GenerateAndIndexIcmpV6DocAsync((Guid)networkId!, transportId, agent, icmpv6, stoppingToken);
+                }
+                if (network is IgmpV2Packet)
+                {
+                    IgmpV2Packet igmp = (IgmpV2Packet)network;
+                    await GenerateAndIndexIgmpV2DocAsync((Guid)networkId!, transportId, agent, igmp, stoppingToken);
+                }
             }
+            if (transport != null)
+            {
+                if (transport is TcpPacket)
+                {
+                    TcpPacket tcp = (TcpPacket)transport;
+                    await GenerateAndIndexTcpDocAsync((Guid)networkId!, transportId, agent, tcp, stoppingToken);
+                }
+                if (transport is UdpPacket)
+                {
+                    UdpPacket udp = (UdpPacket)transport;
+                    await GenerateAndIndexUdpDocAsync((Guid)networkId!, transportId, agent, udp, stoppingToken);
+                }
+            }           
         }
 
         /// <summary>
@@ -348,39 +330,22 @@ namespace PacketDataIndexer
             }
             else
             {
-                var bulkDescriptor = new BulkDescriptor("statistics");
+                //var bulkDescriptor = new BulkDescriptor("statistics");
 
-                while (_statisticsQueue.TryDequeue(out var d))
-                {
-                    bulkDescriptor.Index<StatisticsDocument>(s => s
-                        .Document(d)
-                        .Id(d.Id)
-                    );
-                }
+                //while (_statisticsQueue.TryDequeue(out var d))
+                //{
+                //    bulkDescriptor.Index<StatisticsDocument>(s => s
+                //        .Document(d)
+                //        .Id(d.Id)
+                //    );
+                //}
 
-                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
+                //var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
 
-                if (!bulkResponse.IsValid)
-                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
+                //if (!bulkResponse.IsValid)
+                //    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
             }
         }
-
-        /// <summary>
-        /// Метод, извлекающий пакет транспортного уровня модели OSI.
-        /// </summary>
-        /// <param name="packet">Пакет.</param>
-        /// <returns>Извлеченный пакет транспортного уровня.</returns>
-        private object? GetTransport(Packet packet) => 
-            packet.Extract<TcpPacket>() ?? (dynamic)packet.Extract<UdpPacket>();
-
-        /// <summary>
-        /// Метод, извлекающий пакет сетевого уровня модели OSI.
-        /// </summary>
-        /// <param name="packet">Пакет.</param>
-        /// <returns>Извлеченный пакет сетевого уровня.</returns>
-        private object? GetNetwork(Packet packet) =>
-            packet.Extract<IcmpV4Packet>() ?? packet.Extract<IcmpV6Packet>() ??
-            packet.Extract<IgmpV2Packet>() ?? packet.Extract<IPv4Packet>() ?? (dynamic)packet.Extract<IPv6Packet>();
 
         /// <summary>
         /// Метод очистки потоков Redis от устаревших данных.
@@ -390,16 +355,13 @@ namespace PacketDataIndexer
         /// <returns></returns>
         private async Task ClearRedisStreamAsync(List<RedisKey> agents, CancellationToken stoppingToken)
         {
-            int? timeout = int.Parse(_config["ClearTimeout"]);
-            int? ttl = int.Parse(_config["StreamTTL"]);
-
-            if (!timeout.HasValue)
+            if (!int.TryParse(_config["ClearTimeout"], out int timeout))
             {
                 Dispose();
                 _logger.LogError(Error.FailedToReadClearTimeout);
                 Environment.Exit(1);
             }
-            if (!ttl.HasValue)
+            if (!int.TryParse(_config["StreamTTL"], out int ttl))
             {
                 Dispose();
                 _logger.LogError(Error.FailedToReadStreamTTL);
@@ -408,7 +370,7 @@ namespace PacketDataIndexer
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(timeout.Value));
+                await Task.Delay(TimeSpan.FromSeconds(timeout));
 
                 foreach (var agent in agents)
                 {
@@ -417,7 +379,7 @@ namespace PacketDataIndexer
 
                      var rawPacketsToDelete = entries
                         .Where(e => e.Values.First().Name.StartsWith("raw_packets"))
-                        .Where(e => JsonConvert.DeserializeObject<RawPacket>(e.Values.First().Value.ToString()).Timeval.Date + TimeSpan.FromHours((double)ttl) < DateTime.UtcNow)
+                        .Where(e => JsonConvert.DeserializeObject<RawPacket>(e.Values.First().Value.ToString())!.Timeval.Date + TimeSpan.FromHours(ttl) < DateTime.UtcNow)
                         .Select(e => e.Id)
                         .ToArray();
                     if (rawPacketsToDelete.Any())
@@ -425,7 +387,7 @@ namespace PacketDataIndexer
 
                     var statisticsToDelete = entries
                         .Where(e => e.Values.First().Name.StartsWith("statistics"))
-                        .Where(e => JsonConvert.DeserializeObject<Statistics>(e.Values.First().Value.ToString()).Timeval.Date + TimeSpan.FromHours((double)ttl) < DateTime.UtcNow)
+                        .Where(e => JsonConvert.DeserializeObject<Statistics>(e.Values.First().Value.ToString())!.Timeval.Date + TimeSpan.FromHours(ttl) < DateTime.UtcNow)
                         .Select(e => e.Id)  
                         .ToArray();
                     if (statisticsToDelete.Any())
@@ -457,6 +419,447 @@ namespace PacketDataIndexer
                 agents.Add(new RedisKey(key));
                        
             return agents;
+        }
+
+        /// <summary>
+        /// Метод, извлекающий пакет транспортного уровня модели OSI.
+        /// </summary>
+        /// <param name="packet">Пакет.</param>
+        /// <returns>Извлеченный пакет транспортного уровня.</returns>
+        private object? GetTransport(Packet packet) =>
+            packet.Extract<TcpPacket>() ?? (object)packet.Extract<UdpPacket>();
+
+        /// <summary>
+        /// Метод, извлекающий пакет сетевого уровня модели OSI.
+        /// </summary>
+        /// <param name="packet">Пакет.</param>
+        /// <returns>Извлеченный пакет сетевого уровня.</returns>
+        private object? GetNetwork(Packet packet) =>
+            packet.Extract<IcmpV4Packet>() ?? packet.Extract<IcmpV6Packet>() ??
+            packet.Extract<IgmpV2Packet>() ?? packet.Extract<IPv4Packet>() ?? (object)packet.Extract<IPv6Packet>();
+
+        /// <summary>
+        /// Фомирование и индексация документа с IPv4 пакетом.
+        /// </summary>
+        /// <param name="networkId"></param>
+        /// <param name="transportId"></param>
+        /// <param name="agent"></param>
+        /// <param name="ipv4"></param>
+        /// <param name="stoppingToken"></param>
+        /// <returns></returns>
+        private async Task GenerateAndIndexIPv4DocAsync(Guid networkId, Guid? transportId, RedisKey agent, IPv4Packet ipv4, CancellationToken stoppingToken)
+        {
+            var document = new IPv4Document
+            {
+                Id = networkId,
+                Nested = transportId,
+                Agent = agent.ToString(),
+                Bytes = ipv4.Bytes,
+                HasPayloadData = ipv4.HasPayloadData,
+                HasPayloadPacket = ipv4.HasPayloadPacket,
+                HeaderData = ipv4.HeaderData,
+                PayloadData = ipv4.PayloadData,
+                IsPayloadInitialized = ipv4.IsPayloadInitialized,
+                TotalPacketLength = ipv4.TotalPacketLength,
+                Checksum = ipv4.Checksum,
+                Color = ipv4.Color,
+                DestinationAddress = ipv4.DestinationAddress,
+                DifferentiatedServices = ipv4.DifferentiatedServices,
+                FragmentFlags = ipv4.FragmentFlags,
+                FragmentOffset = ipv4.FragmentOffset,
+                HeaderLength = ipv4.HeaderLength,
+                HopLimit = ipv4.HopLimit,
+                IPv4Id = ipv4.Id,
+                PayloadLength = ipv4.PayloadLength,
+                Protocol = ipv4.Protocol,
+                SourceAddress = ipv4.SourceAddress,
+                TimeToLive = ipv4.TimeToLive,
+                TotalLength = ipv4.TotalLength,
+                TypeOfService = ipv4.TypeOfService,
+                ValidChecksum = ipv4.ValidChecksum,
+                ValidIPChecksum = ipv4.ValidIPChecksum,
+                Version = ipv4.Version
+            };
+
+            if (_packetsQueue.Count < _maxQueueSize)
+            {
+                _packetsQueue.Enqueue(document);
+            }
+            else
+            {
+                var bulkDescriptor = new BulkDescriptor("ipv4");
+
+                while (_packetsQueue.TryDequeue(out var d))
+                {
+                    var doc = (IPv4Document)d;
+                    bulkDescriptor.Index<IPv4Document>(s => s
+                        .Document(doc)
+                        .Id(doc.Id)
+                    );
+                }
+
+                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
+
+                if (!bulkResponse.IsValid)
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
+            }
+        }
+
+        /// <summary>
+        /// Фомирование и индексация документа с IPv6 пакетом.
+        /// </summary>
+        /// <param name="networkId"></param>
+        /// <param name="transportId"></param>
+        /// <param name="agent"></param>
+        /// <param name="ipv6"></param>
+        /// <param name="stoppingToken"></param>
+        /// <returns></returns>
+        private async Task GenerateAndIndexIPv6DocAsync(Guid networkId, Guid? transportId, RedisKey agent, IPv6Packet ipv6, CancellationToken stoppingToken)
+        {
+            var document = new IPv6Document
+            {
+                Id = networkId,
+                Nested = transportId,
+                Agent = agent.ToString(),
+                Bytes = ipv6.Bytes,
+                HasPayloadData = ipv6.HasPayloadData,
+                HasPayloadPacket = ipv6.HasPayloadPacket,
+                HeaderData = ipv6.HeaderData,
+                PayloadData = ipv6.PayloadData,
+                IsPayloadInitialized = ipv6.IsPayloadInitialized,
+                TotalPacketLength = ipv6.TotalPacketLength,
+                Color = ipv6.Color,
+                DestinationAddress = ipv6.DestinationAddress,
+                ExtensionHeaders = ipv6.ExtensionHeaders.Select(h => (IPv6ExtensionHeader)h).ToList(),
+                ExtensionHeadersLength = ipv6.ExtensionHeadersLength,
+                FlowLabel = ipv6.FlowLabel,
+                HeaderLength = ipv6.HeaderLength,
+                HopLimit = ipv6.HopLimit,
+                NextHeader = ipv6.NextHeader,
+                PayloadLength = ipv6.PayloadLength,
+                Protocol = ipv6.Protocol,
+                SourceAddress = ipv6.SourceAddress,
+                TimeToLive = ipv6.TimeToLive,
+                TotalLength = ipv6.TotalLength,
+                TrafficClass = ipv6.TrafficClass,
+                Version = ipv6.Version
+            };
+
+            if (_packetsQueue.Count < _maxQueueSize)
+            {
+                _packetsQueue.Enqueue(document);
+            }
+            else
+            {
+                var bulkDescriptor = new BulkDescriptor("ipv6");
+
+                while (_packetsQueue.TryDequeue(out var d))
+                {
+                    var doc = (IPv6Document)d;
+                    bulkDescriptor.Index<IPv6Document>(s => s
+                        .Document(doc)
+                        .Id(doc.Id)
+                    );
+                }
+
+                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
+
+                if (!bulkResponse.IsValid)
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
+            }
+        }
+
+        /// <summary>
+        /// Фомирование и индексация документа с IcmpV4 пакетом.
+        /// </summary>
+        /// <param name="networkId"></param>
+        /// <param name="transportId"></param>
+        /// <param name="agent"></param>
+        /// <param name="icmpv4"></param>
+        /// <param name="stoppingToken"></param>
+        /// <returns></returns>
+        private async Task GenerateAndIndexIcmpV4DocAsync(Guid networkId, Guid? transportId, RedisKey agent, IcmpV4Packet icmpv4, CancellationToken stoppingToken)
+        {
+            var document = new IcmpV4Document
+            {
+                Id = networkId,
+                Nested = transportId,
+                Agent = agent.ToString(),
+                Bytes = icmpv4.Bytes,
+                HasPayloadData = icmpv4.HasPayloadData,
+                HeaderData = icmpv4.HeaderData,
+                HasPayloadPacket = icmpv4.HasPayloadPacket,
+                IsPayloadInitialized = icmpv4.IsPayloadInitialized,
+                PayloadData = icmpv4.PayloadData,
+                TotalPacketLength = icmpv4.TotalPacketLength,
+                Color = icmpv4.Color,
+                Checksum = icmpv4.Checksum,
+                TypeCode = icmpv4.TypeCode,
+                Data = icmpv4.Data,
+                IcmpV4Id = icmpv4.Id,
+                Sequence = icmpv4.Sequence,
+                ValidIcmpChecksum = icmpv4.ValidIcmpChecksum
+            };
+
+            if (_packetsQueue.Count < _maxQueueSize)
+            {
+                _packetsQueue.Enqueue(document);
+            }
+            else
+            {
+                var bulkDescriptor = new BulkDescriptor("icmp4");
+
+                while (_packetsQueue.TryDequeue(out var d))
+                {
+                    var doc = (IcmpV4Document)d;
+                    bulkDescriptor.Index<IcmpV4Document>(s => s
+                        .Document(doc)
+                        .Id(doc.Id)
+                    );
+                }
+
+                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
+
+                if (!bulkResponse.IsValid)
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
+            }
+        }
+
+        /// <summary>
+        /// Фомирование и индексация документа с IcmpV6 пакетом.
+        /// </summary>
+        /// <param name="networkId"></param>
+        /// <param name="transportId"></param>
+        /// <param name="agent"></param>
+        /// <param name="icmpv6"></param>
+        /// <param name="stoppingToken"></param>
+        /// <returns></returns>
+        private async Task GenerateAndIndexIcmpV6DocAsync(Guid networkId, Guid? transportId, RedisKey agent, IcmpV6Packet icmpv6, CancellationToken stoppingToken)
+        {
+            var document = new IcmpV6Document
+            {
+                Id = networkId,
+                Nested = transportId,
+                Agent = agent.ToString(),
+                Bytes = icmpv6.Bytes,
+                HasPayloadData = icmpv6.HasPayloadData,
+                HasPayloadPacket = icmpv6.HasPayloadPacket,
+                HeaderData = icmpv6.HeaderData,
+                IsPayloadInitialized = icmpv6.IsPayloadInitialized,
+                PayloadData = icmpv6.PayloadData,
+                TotalPacketLength = icmpv6.TotalPacketLength,
+                Color = icmpv6.Color,
+                Checksum = icmpv6.Checksum,
+                Code = icmpv6.Code,
+                ValidIcmpChecksum = icmpv6.ValidIcmpChecksum,
+                Type = icmpv6.Type
+            };
+
+            if (_packetsQueue.Count < _maxQueueSize)
+            {
+                _packetsQueue.Enqueue(document);
+            }
+            else
+            {
+                var bulkDescriptor = new BulkDescriptor("icmp6");
+
+                while (_packetsQueue.TryDequeue(out var d))
+                {
+                    var doc = (IcmpV6Document)d;
+                    bulkDescriptor.Index<IcmpV6Document>(s => s
+                        .Document(doc)
+                        .Id(doc.Id)
+                    );
+                }
+
+                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
+
+                if (!bulkResponse.IsValid)
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
+            }
+        }
+
+        /// <summary>
+        /// Фомирование и индексация документа с IgmpV2 пакетом.
+        /// </summary>
+        /// <param name="networkId"></param>
+        /// <param name="transportId"></param>
+        /// <param name="agent"></param>
+        /// <param name="igmp"></param>
+        /// <param name="stoppingToken"></param>
+        /// <returns></returns>
+        private async Task GenerateAndIndexIgmpV2DocAsync(Guid networkId, Guid? transportId, RedisKey agent, IgmpV2Packet igmp, CancellationToken stoppingToken)
+        {
+            var document = new IgmpV2Document
+            {
+                Id = networkId,
+                Nested = transportId,
+                Agent = agent.ToString(),
+                Bytes = igmp.Bytes,
+                Checksum = igmp.Checksum,
+                Color = igmp.Color,
+                GroupAddress = igmp.GroupAddress,
+                HasPayloadData = igmp.HasPayloadData,
+                HasPayloadPacket = igmp.HasPayloadPacket,
+                HeaderData = igmp.HeaderData,
+                IsPayloadInitialized = igmp.IsPayloadInitialized,
+                MaxResponseTime = igmp.MaxResponseTime,
+                PayloadData = igmp.PayloadData,
+                TotalPacketLength = igmp.TotalPacketLength,
+                Type = igmp.Type
+            };
+
+            if (_packetsQueue.Count < _maxQueueSize)
+            {
+                _packetsQueue.Enqueue(document);
+            }
+            else
+            {
+                var bulkDescriptor = new BulkDescriptor("igmp");
+
+                while (_packetsQueue.TryDequeue(out var d))
+                {
+                    var doc = (IgmpV2Document)d;
+                    bulkDescriptor.Index<IgmpV2Document>(s => s
+                        .Document(doc)
+                        .Id(doc.Id)
+                    );
+                }
+
+                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
+
+                if (!bulkResponse.IsValid)
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
+            }
+        }
+
+        /// <summary>
+        /// Фомирование и индексация документа с Tcp пакетом.
+        /// </summary>
+        /// <param name="transportId"></param>
+        /// <param name="networkId"></param>
+        /// <param name="agent"></param>
+        /// <param name="tcp"></param>
+        /// <param name="stoppingToken"></param>
+        /// <returns></returns>
+        private async Task GenerateAndIndexTcpDocAsync(Guid transportId, Guid? networkId, RedisKey agent, TcpPacket tcp, CancellationToken stoppingToken)
+        {
+            var document = new TcpDocument
+            {
+                Id = transportId,
+                Nested = networkId,
+                Agent = agent.ToString(),
+                Acknowledgment = tcp.Acknowledgment,
+                AcknowledgmentNumber = tcp.AcknowledgmentNumber,
+                Bytes = tcp.Bytes,
+                Checksum = tcp.Checksum,
+                Color = tcp.Color,
+                CongestionWindowReduced = tcp.CongestionWindowReduced,
+                DataOffset = tcp.DataOffset,
+                DestinationPort = tcp.DestinationPort,
+                ExplicitCongestionNotificationEcho = tcp.ExplicitCongestionNotificationEcho,
+                Finished = tcp.Finished,
+                Flags = tcp.Flags,
+                HasPayloadData = tcp.HasPayloadData,
+                HasPayloadPacket = tcp.HasPayloadPacket,
+                HeaderData = tcp.HeaderData,
+                IsPayloadInitialized = tcp.IsPayloadInitialized,
+                NonceSum = tcp.NonceSum,
+                Options = tcp.Options,
+                OptionsCollection = tcp.OptionsCollection.Select(o => (TcpOption)o).ToList(),
+                OptionsSegment = tcp.OptionsSegment.ActualBytes(),
+                PayloadData = tcp.PayloadData,
+                Push = tcp.Push,
+                Reset = tcp.Reset,
+                SequenceNumber = tcp.SequenceNumber,
+                SourcePort = tcp.SourcePort,
+                Synchronize = tcp.Synchronize,
+                TotalPacketLength = tcp.TotalPacketLength,
+                Urgent = tcp.Urgent,
+                UrgentPointer = tcp.UrgentPointer,
+                ValidChecksum = tcp.ValidChecksum,
+                ValidTcpChecksum = tcp.ValidTcpChecksum,
+                WindowSize = tcp.WindowSize,
+            };
+
+            if (_packetsQueue.Count < _maxQueueSize)
+            {
+                _packetsQueue.Enqueue(document);
+            }
+            else
+            {
+                var bulkDescriptor = new BulkDescriptor("tcp");
+
+                while (_packetsQueue.TryDequeue(out var d))
+                {
+                    var doc = (TcpDocument)d;
+                    bulkDescriptor.Index<TcpDocument>(s => s
+                        .Document(doc)
+                        .Id(doc.Id)
+                    );
+                }
+
+                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
+
+                if (!bulkResponse.IsValid)
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
+            }
+        }
+
+        /// <summary>
+        /// Фомирование и индексация документа с Udp пакетом.
+        /// </summary>
+        /// <param name="transportId"></param>
+        /// <param name="networkId"></param>
+        /// <param name="agent"></param>
+        /// <param name="udp"></param>
+        /// <param name="stoppingToken"></param>
+        /// <returns></returns>
+        private async Task GenerateAndIndexUdpDocAsync(Guid transportId, Guid? networkId, RedisKey agent, UdpPacket udp, CancellationToken stoppingToken)
+        {
+            var document = new UdpDocument
+            {
+                Id = transportId,
+                Nested = networkId,
+                Agent = agent.ToString(),
+                Bytes = udp.Bytes,
+                Checksum = udp.Checksum,
+                Color = udp.Color,
+                DestinationPort = udp.DestinationPort,
+                HasPayloadData = udp.HasPayloadData,
+                HasPayloadPacket = udp.HasPayloadPacket,
+                HeaderData = udp.HeaderData,
+                IsPayloadInitialized = udp.IsPayloadInitialized,
+                Length = udp.Length,
+                PayloadData = udp.PayloadData,
+                SourcePort = udp.SourcePort,
+                TotalPacketLength = udp.TotalPacketLength,
+                ValidChecksum = udp.ValidChecksum,
+                ValidUdpChecksum = udp.ValidUdpChecksum,
+            };
+
+            if (_packetsQueue.Count < _maxQueueSize)
+            {
+                _packetsQueue.Enqueue(document);
+            }
+            else
+            {
+                var bulkDescriptor = new BulkDescriptor("udp");
+
+                while (_packetsQueue.TryDequeue(out var d))
+                {
+                    var doc = (UdpDocument)d;
+                    bulkDescriptor.Index<UdpDocument>(s => s
+                        .Document(doc)
+                        .Id(doc.Id)
+                    );
+                }
+
+                var bulkResponse = await _elasticClient.BulkAsync(bulkDescriptor, stoppingToken);
+
+                if (!bulkResponse.IsValid)
+                    _logger.LogWarning(Warning.AnErrorOccuredWhileIndexing, bulkResponse.OriginalException.Message);
+            }
         }
 
         public override void Dispose()
