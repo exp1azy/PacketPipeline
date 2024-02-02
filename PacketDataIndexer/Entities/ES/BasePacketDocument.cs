@@ -6,6 +6,8 @@
 
         public Guid? Nested { get; set; }
 
+        public string Model { get; set; }
+
         public string Agent { get; set; }
 
         public byte[] Bytes { get; set; }

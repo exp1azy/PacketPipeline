@@ -24,8 +24,8 @@ namespace PacketDataIndexer
         private Task? _elasticTask;
         private Task? _clearingTask;
 
-        private ConcurrentQueue<BasePacketDocument> _packetsQueue;
-        private ConcurrentQueue<StatisticsDocument> _statisticsQueue;
+        private List<BasePacketDocument> _packetsQueue;
+        private List<StatisticsDocument> _statisticsQueue;
         private int _maxQueueSize;
 
         /// <summary>
@@ -37,25 +37,48 @@ namespace PacketDataIndexer
         {
             _config = config;
             _logger = logger;
-         
-            _redisTask = Task.Run(() => { _redisService = new RedisService(config, logger); });         
-            _elasticTask = Task.Run(() => { _elasticSearchService = new ElasticSearchService(config, logger); });
 
             if (int.TryParse(_config["MaxQueueSize"], out int maxQueueSize))
             {
-                _maxQueueSize = maxQueueSize;
+                _maxQueueSize = maxQueueSize;           
             }
             else
             {
-                _logger.LogError(Error.FailedToReadMaxQueueSize);
+                _maxQueueSize = 50;
+                _logger.LogWarning(Warning.FailedToReadMaxQueueSize);
+            }
+
+            var redisConnection = _config.GetConnectionString("RedisConnection");
+            if (string.IsNullOrEmpty(redisConnection))
+            {
+                _logger.LogError(Error.FailedToReadRedisConnectionString);
                 Environment.Exit(1);
             }
 
-            _packetsQueue = new ConcurrentQueue<BasePacketDocument>();
-            _statisticsQueue = new ConcurrentQueue<StatisticsDocument>();
+            _redisService = new RedisService(logger);
+            _redisTask = Task.Run(async () => { await _redisService.ConnectAsync(redisConnection); });
+
+            var elasticConnection = _config.GetConnectionString("ElasticConnection");
+            if (string.IsNullOrEmpty(elasticConnection))
+            {
+                _logger?.LogError(Error.FailedToReadElasticConnectionString);
+                Environment.Exit(1);
+            }
+
+            var authParams = _config.GetSection("ElasticSearchAuth");
+            if (string.IsNullOrEmpty(authParams["Username"]) || string.IsNullOrEmpty(authParams["Password"]))
+            {
+                _logger.LogError(Error.FailedToReadESAuthParams);
+                Environment.Exit(1);
+            }
+
+            _elasticSearchService = new ElasticSearchService(logger);
+            _elasticTask = Task.Run(async () => { await _elasticSearchService.ConnectAsync(elasticConnection, authParams["Username"]!, authParams["Password"]!); });
+
+            _packetsQueue = new List<BasePacketDocument>(_maxQueueSize);
+            _statisticsQueue = new List<StatisticsDocument>(_maxQueueSize);
         }
 
-        
         /// <summary>
         /// Входящий метод, получающий список агентов и запускающий прослушивание потоков каждого агента.
         /// </summary>
@@ -65,7 +88,7 @@ namespace PacketDataIndexer
         {
             await Task.WhenAll(_redisTask!, _elasticTask!);
 
-            var agents = _redisService.GetRedisKeys();
+            var agents = _redisService.GetRedisKeys(_config.GetConnectionString("RedisConnection")!, 6379);
             while (!agents.Any())
             {
                 try
@@ -74,7 +97,7 @@ namespace PacketDataIndexer
 
                     _logger.LogWarning(Warning.NoAgentsWereFound);
                     await Task.Delay(10000);
-                    agents = _redisService.GetRedisKeys();
+                    agents = _redisService.GetRedisKeys(_config.GetConnectionString("RedisConnection")!, 6379);
                 }
                 catch (OperationCanceledException)
                 {
@@ -82,13 +105,35 @@ namespace PacketDataIndexer
                 }                            
             }
 
-            int streamCount = 500;
+            int timeout;
+            if (!int.TryParse(_config["ClearTimeout"], out timeout))
+            {
+                timeout = 60;
+                _logger.LogWarning(Warning.FailedToReadClearTimeout);
+            }
+
+            int ttl;
+            if (!int.TryParse(_config["StreamTTL"], out ttl))
+            {
+                ttl = 12;
+                _logger.LogWarning(Warning.FailedToReadStreamTTL);
+            }
+
+            _clearingTask = Task.Run(() => _redisService.ClearRedisStreamAsync(timeout, ttl, agents, stoppingToken));
+
+            int streamCount;
             if (!int.TryParse(_config["StreamCount"], out streamCount))
             {
+                streamCount = 500;
                 _logger.LogWarning(Warning.FailedToReadStreamCount);
             }
-                   
-            _clearingTask = Task.Run(() => _redisService.ClearRedisStreamAsync(agents, stoppingToken));
+
+            int streamReadDelay;
+            if (!int.TryParse(_config["StreamReadDelay"], out streamReadDelay))
+            {
+                streamReadDelay = 10;
+                _logger.LogWarning(Warning.FailedToReadStreamReadDelay);
+            }
 
             var tasks = new List<Task>();
 
@@ -102,11 +147,17 @@ namespace PacketDataIndexer
                         try
                         {
                             var entries = await _redisService.ReadStreamAsync(agent, offset, streamCount);
+                            while (entries.Length == 0)
+                            {
+                                _logger.LogWarning(Warning.StreamIsEmpty, agent);
+                                await Task.Delay(TimeSpan.FromSeconds(10));
+                                entries = await _redisService.ReadStreamAsync(agent, offset, streamCount);
+                            }
 
                             var rawPackets = NetworkHandler.GetDeserializedRawPackets(entries);
-                            foreach (var p in rawPackets)
+                            foreach (var rp in rawPackets)
                             {
-                                var packet = Packet.ParsePacket((LinkLayers)p.LinkLayerType, p.Data);
+                                var packet = Packet.ParsePacket((LinkLayers)rp!.LinkLayerType, rp.Data);
                                 await GenerateAndIndexNetworkAsync(packet, agent, stoppingToken);
                             }
 
@@ -173,13 +224,13 @@ namespace PacketDataIndexer
 
             if (_statisticsQueue.Count < _maxQueueSize)
             {
-                _statisticsQueue.Enqueue(document);
+                _statisticsQueue.Add(document);
             }
             else
             {
                 var bulkDescriptor = new BulkDescriptor("statistics");
 
-                while (_statisticsQueue.TryDequeue(out var d))
+                foreach (var d in _statisticsQueue)
                 {
                     bulkDescriptor.Index<StatisticsDocument>(s => s
                         .Document(d)
@@ -188,11 +239,13 @@ namespace PacketDataIndexer
                 }
 
                 await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
+
+                _statisticsQueue.Clear();
             }
         }
 
         /// <summary>
-        /// Фомирование и индексация документа с IPv4 пакетом.
+        /// Фомирование и индексация документа с пакетом сетевого уровня.
         /// </summary>
         /// <param name="networkId"></param>
         /// <param name="transportId"></param>
@@ -203,18 +256,17 @@ namespace PacketDataIndexer
         private async Task HandleNetworkAsync(object network, Guid networkId, Guid? transportId, RedisKey agent, CancellationToken stoppingToken)
         {
             var document = NetworkHandler.GenerateNetworkDocument(network, networkId, transportId, agent.ToString());
-
             if (document == null) return;
             
             if (_packetsQueue.Count < _maxQueueSize)
             {
-                _packetsQueue.Enqueue(document);
+                _packetsQueue.Add(document);
             }
             else
             {
                 var bulkDescriptor = new BulkDescriptor();
 
-                while (_packetsQueue.TryDequeue(out var d))
+                foreach (var d in _packetsQueue.Where(p => p.Model == "Network"))
                 {
                     if (d is IPv4Document)
                     {
@@ -264,16 +316,18 @@ namespace PacketDataIndexer
                 }
 
                 await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
+
+                _packetsQueue.RemoveAll(p => p.Model == "Network");
             }
         }
 
         /// <summary>
-        /// Фомирование и индексация документа с Tcp пакетом.
+        /// Фомирование и индексация документа с пакетом траспортного уровня.
         /// </summary>
+        /// <param name="transport"></param>
         /// <param name="transportId"></param>
         /// <param name="networkId"></param>
         /// <param name="agent"></param>
-        /// <param name="tcp"></param>
         /// <param name="stoppingToken"></param>
         /// <returns></returns>
         private async Task HandleTransportAsync(object transport, Guid transportId, Guid? networkId, RedisKey agent, CancellationToken stoppingToken)
@@ -284,13 +338,13 @@ namespace PacketDataIndexer
 
             if (_packetsQueue.Count < _maxQueueSize)
             {
-                _packetsQueue.Enqueue(document);
+                _packetsQueue.Add(document);
             }
             else
             {
                 var bulkDescriptor = new BulkDescriptor();
 
-                while (_packetsQueue.TryDequeue(out var d))
+                foreach (var d in _packetsQueue.Where(p => p.Model == "Transport"))
                 {
                     if (d is TcpDocument)
                     {
@@ -313,6 +367,8 @@ namespace PacketDataIndexer
                 }
 
                 await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
+
+                _packetsQueue.RemoveAll(p => p.Model == "Transport");
             }
         }
     }

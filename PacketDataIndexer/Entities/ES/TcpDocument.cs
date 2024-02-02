@@ -26,7 +26,7 @@ namespace PacketDataIndexer.Entities.ES
 
         public byte[] Options { get; set; }
 
-        public List<TcpOption> OptionsCollection { get; set; }
+        public List<TcpOption>? OptionsCollection { get; set; }
 
         public byte[] OptionsSegment { get; set; }
 

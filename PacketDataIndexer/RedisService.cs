@@ -5,26 +5,22 @@ using StackExchange.Redis;
 
 namespace PacketDataIndexer
 {
+    /// <summary>
+    /// Сервис, представляющий логику для взаимодействия с сервером Redis.
+    /// </summary>
     internal class RedisService
     {
         private IDatabase _redisDatabase;
         private ConnectionMultiplexer? _redisConnection;
-        private readonly IConfiguration _config;
         private readonly ILogger<PacketPipeline> _logger;
 
-        public RedisService(IConfiguration config, ILogger<PacketPipeline> logger)
+        /// <summary>
+        /// Конструктор.
+        /// </summary>
+        /// <param name="logger">Логи.</param>
+        public RedisService(ILogger<PacketPipeline> logger)
         {
-            _config = config;
-            _logger = logger;
-
-            var redisConnection = _config.GetConnectionString("RedisConnection");
-            if (string.IsNullOrEmpty(redisConnection))
-            {
-                _logger.LogError(Error.FailedToReadRedisConnectionString);
-                Environment.Exit(1);
-            }
-
-            ConnectAsync(redisConnection).Wait();
+            _logger = logger;          
         }
 
         /// <summary>
@@ -64,14 +60,14 @@ namespace PacketDataIndexer
         /// Метод, возвращающий агентов из сервера Redis.
         /// </summary>
         /// <returns>Список ключей.</returns>
-        public List<RedisKey> GetRedisKeys()
+        public List<RedisKey> GetRedisKeys(string host, int port)
         {
             IServer? server = default;
             var agents = new List<RedisKey>();
 
             try
             {
-                server = _redisConnection!.GetServer(_config["ConnectionStrings:RedisConnection"]!, 6379);
+                server = _redisConnection!.GetServer(host, port);
             }
             catch
             {
@@ -91,19 +87,8 @@ namespace PacketDataIndexer
         /// <param name="agents">Список агентов.</param>
         /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
-        public async Task ClearRedisStreamAsync(List<RedisKey> agents, CancellationToken stoppingToken)
+        public async Task ClearRedisStreamAsync(int timeout, int ttl, List<RedisKey> agents, CancellationToken stoppingToken)
         {
-            if (!int.TryParse(_config["ClearTimeout"], out int timeout))
-            {
-                _logger.LogError(Error.FailedToReadClearTimeout);
-                Environment.Exit(1);
-            }
-            if (!int.TryParse(_config["StreamTTL"], out int ttl))
-            {
-                _logger.LogError(Error.FailedToReadStreamTTL);
-                Environment.Exit(1);
-            }
-
             while (!stoppingToken.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromSeconds(timeout));

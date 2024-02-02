@@ -5,32 +5,21 @@ using Error = PacketDataIndexer.Resources.Error;
 
 namespace PacketDataIndexer
 {
+    /// <summary>
+    /// Сервис, представляющий логику для взаимодействия с сервером ElasticSearch.
+    /// </summary>
     internal class ElasticSearchService
     {
         private ElasticClient _elasticClient;
-        private readonly IConfiguration _config;
         private readonly ILogger<PacketPipeline> _logger;
 
-        public ElasticSearchService(IConfiguration config, ILogger<PacketPipeline> logger)
+        /// <summary>
+        /// Конструктор.
+        /// </summary>
+        /// <param name="logger">Логи.</param>
+        public ElasticSearchService(ILogger<PacketPipeline> logger)
         {
-            _config = config;
             _logger = logger;
-
-            var elasticConnection = _config.GetConnectionString("ElasticConnection");
-            if (string.IsNullOrEmpty(elasticConnection))
-            {
-                _logger?.LogError(Error.FailedToReadElasticConnectionString);
-                Environment.Exit(1);
-            }
-
-            var authParams = _config.GetSection("ElasticSearchAuth");
-            if (string.IsNullOrEmpty(authParams["Username"]) || string.IsNullOrEmpty(authParams["Password"]))
-            {
-                _logger.LogError(Error.FailedToReadESAuthParams);
-                Environment.Exit(1);
-            }
-
-            ConnectAsync(elasticConnection!, authParams["Username"]!, authParams["Password"]!).Wait();
         }
 
         /// <summary>

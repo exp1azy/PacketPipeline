@@ -70,11 +70,29 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать ClearTimeout из файла конфигурации. Установлено значение &quot;60&quot;.
+        /// </summary>
+        internal static string FailedToReadClearTimeout {
+            get {
+                return ResourceManager.GetString("FailedToReadClearTimeout", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Ищет локализованную строку, похожую на Не удалось прочитать LastRedisValueIndex из файла конфигурации. Установлено значение &quot;0&quot;.
         /// </summary>
         internal static string FailedToReadLastRedisValueIndex {
             get {
                 return ResourceManager.GetString("FailedToReadLastRedisValueIndex", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать MaxQueueSize из файла appsettings.json.
+        /// </summary>
+        internal static string FailedToReadMaxQueueSize {
+            get {
+                return ResourceManager.GetString("FailedToReadMaxQueueSize", resourceCulture);
             }
         }
         
@@ -88,11 +106,38 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamReadDelay из файла appsettings.json. Установлено значение &quot;10&quot;.
+        /// </summary>
+        internal static string FailedToReadStreamReadDelay {
+            get {
+                return ResourceManager.GetString("FailedToReadStreamReadDelay", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamTTL из файла конфигурации. Установлено значение &quot;12&quot;.
+        /// </summary>
+        internal static string FailedToReadStreamTTL {
+            get {
+                return ResourceManager.GetString("FailedToReadStreamTTL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Ищет локализованную строку, похожую на Не удалось получить агентов. Вероятно, ни один из агентов не взаимодействует с Redis и его потоками. Проверьте работу службы на устройствах.
         /// </summary>
         internal static string NoAgentsWereFound {
             get {
                 return ResourceManager.GetString("NoAgentsWereFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Поток по ключу {0} пуст, ожидаются новые данные.
+        /// </summary>
+        internal static string StreamIsEmpty {
+            get {
+                return ResourceManager.GetString("StreamIsEmpty", resourceCulture);
             }
         }
     }

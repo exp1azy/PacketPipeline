@@ -120,13 +120,28 @@
   <data name="AnErrorOccuredWhileIndexing" xml:space="preserve">
     <value>Произошла ошибка при индексации данных в ElasticSearch: {0}</value>
   </data>
+  <data name="FailedToReadClearTimeout" xml:space="preserve">
+    <value>Не удалось прочитать ClearTimeout из файла конфигурации. Установлено значение "60"</value>
+  </data>
   <data name="FailedToReadLastRedisValueIndex" xml:space="preserve">
     <value>Не удалось прочитать LastRedisValueIndex из файла конфигурации. Установлено значение "0"</value>
+  </data>
+  <data name="FailedToReadMaxQueueSize" xml:space="preserve">
+    <value>Не удалось прочитать MaxQueueSize из файла appsettings.json</value>
   </data>
   <data name="FailedToReadStreamCount" xml:space="preserve">
     <value>Не удалось прочитать StreamCount из файла конфигурации. Установлено значение "500"</value>
   </data>
+  <data name="FailedToReadStreamReadDelay" xml:space="preserve">
+    <value>Не удалось прочитать StreamReadDelay из файла appsettings.json. Установлено значение "10"</value>
+  </data>
+  <data name="FailedToReadStreamTTL" xml:space="preserve">
+    <value>Не удалось прочитать StreamTTL из файла конфигурации. Установлено значение "12"</value>
+  </data>
   <data name="NoAgentsWereFound" xml:space="preserve">
     <value>Не удалось получить агентов. Вероятно, ни один из агентов не взаимодействует с Redis и его потоками. Проверьте работу службы на устройствах</value>
+  </data>
+  <data name="StreamIsEmpty" xml:space="preserve">
+    <value>Поток по ключу {0} пуст, ожидаются новые данные</value>
   </data>
 </root>

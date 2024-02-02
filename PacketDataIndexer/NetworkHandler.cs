@@ -9,7 +9,7 @@ namespace PacketDataIndexer
     internal static class NetworkHandler
     {
         /// <summary>
-        /// Распаковка и десериализация данных о RawPacket из Redis.
+        /// Распаковка и десериализация данных о <see cref="RawPacket"/> из Redis.
         /// </summary>
         /// <returns>Список <see cref="RawPacket"/></returns>
         public static List<RawPacket?> GetDeserializedRawPackets(StreamEntry[] entries)
@@ -23,7 +23,7 @@ namespace PacketDataIndexer
         }
 
         /// <summary>
-        /// Распаковка и десериализация данных о Statistics из Redis.
+        /// Распаковка и десериализация данных о <see cref="Statistics"/> из Redis.
         /// </summary>
         /// <returns>Список <see cref="Statistics"/></returns>
         public static List<Statistics?> GetDeserializedStatistics(StreamEntry[] entries)
@@ -54,7 +54,7 @@ namespace PacketDataIndexer
             packet.Extract<IgmpV2Packet>() ?? packet.Extract<IPv4Packet>() ?? (object)packet.Extract<IPv6Packet>();
 
         /// <summary>
-        /// Формирование документа Statistics для ElasticSearch.
+        /// Формирование документа <see cref="Statistics"/> для ElasticSearch.
         /// </summary>
         /// <param name="statistics">Экземпляр статистики.</param>
         /// <param name="agent">Агент.</param>
@@ -67,7 +67,7 @@ namespace PacketDataIndexer
         };
 
         /// <summary>
-        /// Формирование документа BasePacketDocument для ElasticSearch.
+        /// Формирование документа <see cref="BasePacketDocument"/>, содержащий пакет транспортного уровня, для ElasticSearch.
         /// </summary>
         /// <param name="transport">Неизвлеченный пакет транспортного уровня..</param>
         /// <param name="transportId">Идентификатор для пакета транспортного уровня.</param>
@@ -76,6 +76,8 @@ namespace PacketDataIndexer
         /// <returns>Извлеченный пакет.</returns>
         public static BasePacketDocument? GenerateTransportDocument(object transport, Guid transportId, Guid? networkId, string agent)
         {
+            var model = OSIModel.Transport.ToString();
+
             if (transport is TcpPacket)
             {
                 TcpPacket tcp = (TcpPacket)transport;
@@ -85,6 +87,7 @@ namespace PacketDataIndexer
                     Id = transportId,
                     Nested = networkId,
                     Agent = agent,
+                    Model = model,
                     Acknowledgment = tcp.Acknowledgment,
                     AcknowledgmentNumber = tcp.AcknowledgmentNumber,
                     Bytes = tcp.Bytes,
@@ -102,7 +105,7 @@ namespace PacketDataIndexer
                     IsPayloadInitialized = tcp.IsPayloadInitialized,
                     NonceSum = tcp.NonceSum,
                     Options = tcp.Options,
-                    OptionsCollection = tcp.OptionsCollection.Select(o => (TcpOption)o).ToList(),
+                    OptionsCollection = tcp.OptionsCollection == null ? null : tcp.OptionsCollection.Select(o => (TcpOption)o).ToList(),
                     OptionsSegment = tcp.OptionsSegment.ActualBytes(),
                     PayloadData = tcp.PayloadData,
                     Push = tcp.Push,
@@ -127,6 +130,7 @@ namespace PacketDataIndexer
                     Id = transportId,
                     Nested = networkId,
                     Agent = agent,
+                    Model = model,
                     Bytes = udp.Bytes,
                     Checksum = udp.Checksum,
                     Color = udp.Color,
@@ -145,9 +149,9 @@ namespace PacketDataIndexer
             }
             else return null;
         }
-        
+
         /// <summary>
-        /// Формирование документа BasePacketDocument для ElasticSearch.
+        /// Формирование документа <see cref="BasePacketDocument"/>, содержащий пакет сетевого уровня, для ElasticSearch.
         /// </summary>
         /// <param name="network">Неизвлеченный пакет сетевого уровня.</param>
         /// <param name="networkId">Идентификатор пакета сетевого уровня.</param>
@@ -156,6 +160,8 @@ namespace PacketDataIndexer
         /// <returns>Извлеченный пакет.</returns>
         public static BasePacketDocument? GenerateNetworkDocument(object network, Guid networkId, Guid? transportId, string agent)
         {
+            var model = OSIModel.Network.ToString();
+
             if (network is IPv4Packet)
             {
                 IPv4Packet ipv4 = (IPv4Packet)network;
@@ -165,6 +171,7 @@ namespace PacketDataIndexer
                     Id = networkId,
                     Nested = transportId,
                     Agent = agent,
+                    Model = model,
                     Bytes = ipv4.Bytes,
                     HasPayloadData = ipv4.HasPayloadData,
                     HasPayloadPacket = ipv4.HasPayloadPacket,
@@ -201,6 +208,7 @@ namespace PacketDataIndexer
                     Id = networkId,
                     Nested = transportId,
                     Agent = agent,
+                    Model = model,
                     Bytes = ipv6.Bytes,
                     HasPayloadData = ipv6.HasPayloadData,
                     HasPayloadPacket = ipv6.HasPayloadPacket,
@@ -234,6 +242,7 @@ namespace PacketDataIndexer
                     Id = networkId,
                     Nested = transportId,
                     Agent = agent,
+                    Model = model,
                     Bytes = icmpv4.Bytes,
                     HasPayloadData = icmpv4.HasPayloadData,
                     HeaderData = icmpv4.HeaderData,
@@ -259,6 +268,7 @@ namespace PacketDataIndexer
                     Id = networkId,
                     Nested = transportId,
                     Agent = agent,
+                    Model = model,
                     Bytes = icmpv6.Bytes,
                     HasPayloadData = icmpv6.HasPayloadData,
                     HasPayloadPacket = icmpv6.HasPayloadPacket,
@@ -282,6 +292,7 @@ namespace PacketDataIndexer
                     Id = networkId,
                     Nested = transportId,
                     Agent = agent,
+                    Model = model,
                     Bytes = igmp.Bytes,
                     Checksum = igmp.Checksum,
                     Color = igmp.Color,

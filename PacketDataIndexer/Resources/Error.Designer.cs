@@ -61,15 +61,6 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать ClearTimeout из файла конфигурации.
-        /// </summary>
-        internal static string FailedToReadClearTimeout {
-            get {
-                return ResourceManager.GetString("FailedToReadClearTimeout", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Ищет локализованную строку, похожую на Не удалось прочитать ESConnectionString из файла конфигурации.
         /// </summary>
         internal static string FailedToReadElasticConnectionString {
@@ -88,29 +79,11 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать MaxQueueSize из файла appsettings.json.
-        /// </summary>
-        internal static string FailedToReadMaxQueueSize {
-            get {
-                return ResourceManager.GetString("FailedToReadMaxQueueSize", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Ищет локализованную строку, похожую на Не удалось прочитать RedisConnectionString из файла конфигурации.
         /// </summary>
         internal static string FailedToReadRedisConnectionString {
             get {
                 return ResourceManager.GetString("FailedToReadRedisConnectionString", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamTTL из файла конфигурации.
-        /// </summary>
-        internal static string FailedToReadStreamTTL {
-            get {
-                return ResourceManager.GetString("FailedToReadStreamTTL", resourceCulture);
             }
         }
         

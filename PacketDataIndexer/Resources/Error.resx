@@ -117,23 +117,14 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="FailedToReadClearTimeout" xml:space="preserve">
-    <value>Не удалось прочитать ClearTimeout из файла конфигурации</value>
-  </data>
   <data name="FailedToReadElasticConnectionString" xml:space="preserve">
     <value>Не удалось прочитать ESConnectionString из файла конфигурации</value>
   </data>
   <data name="FailedToReadESAuthParams" xml:space="preserve">
     <value>Не удалось прочитать ESAuthParams из файла конфигурации</value>
   </data>
-  <data name="FailedToReadMaxQueueSize" xml:space="preserve">
-    <value>Не удалось прочитать MaxQueueSize из файла appsettings.json</value>
-  </data>
   <data name="FailedToReadRedisConnectionString" xml:space="preserve">
     <value>Не удалось прочитать RedisConnectionString из файла конфигурации</value>
-  </data>
-  <data name="FailedToReadStreamTTL" xml:space="preserve">
-    <value>Не удалось прочитать StreamTTL из файла конфигурации</value>
   </data>
   <data name="NoConnectionToElastic" xml:space="preserve">
     <value>Не удалось установить соединение с ElasticSearch</value>
