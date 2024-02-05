@@ -111,7 +111,13 @@ namespace PacketDataIndexer
 
             await Task.WhenAll(_redisTask!, _elasticTask!);
 
-            var agents = _redisService.GetRedisKeys(_config.GetConnectionString("RedisConnection")!, 6379);
+            if (!int.TryParse(_config["RedisPort"], out int port))
+            {
+                _logger.LogError(Error.FailedToReadRedisPort);
+                Environment.Exit(1);
+            }
+
+            var agents = _redisService.GetRedisKeys(_config.GetConnectionString("RedisConnection")!, port);
             while (!agents.Any())
             {
                 int agentsReadDelay;

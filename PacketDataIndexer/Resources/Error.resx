@@ -118,13 +118,16 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="FailedToReadElasticConnectionString" xml:space="preserve">
-    <value>Не удалось прочитать ESConnectionString из файла конфигурации</value>
+    <value>Не удалось прочитать ESConnectionString из файла конфигурации appsettings.json</value>
   </data>
   <data name="FailedToReadESAuthParams" xml:space="preserve">
-    <value>Не удалось прочитать ESAuthParams из файла конфигурации</value>
+    <value>Не удалось прочитать ESAuthParams из файла конфигурации appsettings.json</value>
   </data>
   <data name="FailedToReadRedisConnectionString" xml:space="preserve">
-    <value>Не удалось прочитать RedisConnectionString из файла конфигурации</value>
+    <value>Не удалось прочитать RedisConnectionString из файла конфигурации appsettings.json</value>
+  </data>
+  <data name="FailedToReadRedisPort" xml:space="preserve">
+    <value>Не удалось прочитать RedisPort из файла конфигурации appsettings.json</value>
   </data>
   <data name="NoConnectionToElastic" xml:space="preserve">
     <value>Не удалось установить соединение с ElasticSearch</value>

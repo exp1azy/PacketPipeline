@@ -61,7 +61,7 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать ESConnectionString из файла конфигурации.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать ESConnectionString из файла конфигурации appsettings.json.
         /// </summary>
         internal static string FailedToReadElasticConnectionString {
             get {
@@ -70,7 +70,7 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать ESAuthParams из файла конфигурации.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать ESAuthParams из файла конфигурации appsettings.json.
         /// </summary>
         internal static string FailedToReadESAuthParams {
             get {
@@ -79,11 +79,20 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать RedisConnectionString из файла конфигурации.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать RedisConnectionString из файла конфигурации appsettings.json.
         /// </summary>
         internal static string FailedToReadRedisConnectionString {
             get {
                 return ResourceManager.GetString("FailedToReadRedisConnectionString", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать RedisPort из файла конфигурации appsettings.json.
+        /// </summary>
+        internal static string FailedToReadRedisPort {
+            get {
+                return ResourceManager.GetString("FailedToReadRedisPort", resourceCulture);
             }
         }
         
