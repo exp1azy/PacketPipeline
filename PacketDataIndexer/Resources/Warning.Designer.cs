@@ -70,6 +70,15 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать AgentsReadDelay из файла конфигурации appsettings.json. Установлено значение &quot;10&quot;.
+        /// </summary>
+        internal static string FailedToReadAgentsReadDelay {
+            get {
+                return ResourceManager.GetString("FailedToReadAgentsReadDelay", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Ищет локализованную строку, похожую на Не удалось прочитать ClearTimeout из файла конфигурации. Установлено значение &quot;60&quot;.
         /// </summary>
         internal static string FailedToReadClearTimeout {

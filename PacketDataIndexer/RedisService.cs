@@ -60,10 +60,9 @@ namespace PacketDataIndexer
         /// Метод, возвращающий агентов из сервера Redis.
         /// </summary>
         /// <returns>Список ключей.</returns>
-        public List<RedisKey> GetRedisKeys(string host, int port)
+        public IEnumerable<RedisKey> GetRedisKeys(string host, int port)
         {
             IServer? server = default;
-            var agents = new List<RedisKey>();
 
             try
             {
@@ -76,9 +75,7 @@ namespace PacketDataIndexer
             }
 
             foreach (var key in server!.Keys(pattern: "host_*"))
-                agents.Add(new RedisKey(key));
-
-            return agents;
+                yield return new RedisKey(key);
         }
 
         /// <summary>
@@ -87,7 +84,7 @@ namespace PacketDataIndexer
         /// <param name="agents">Список агентов.</param>
         /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
-        public async Task ClearRedisStreamAsync(int timeout, int ttl, List<RedisKey> agents, CancellationToken stoppingToken)
+        public async Task ClearRedisStreamAsync(int timeout, int ttl, IEnumerable<RedisKey> agents, CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {

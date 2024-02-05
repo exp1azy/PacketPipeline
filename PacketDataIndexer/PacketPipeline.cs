@@ -40,7 +40,7 @@ namespace PacketDataIndexer
 
             if (int.TryParse(_config["MaxQueueSize"], out int maxQueueSize))
             {
-                _maxQueueSize = maxQueueSize;           
+                _maxQueueSize = maxQueueSize;
             }
             else
             {
@@ -48,6 +48,15 @@ namespace PacketDataIndexer
                 _logger.LogWarning(Warning.FailedToReadMaxQueueSize);
             }
 
+            _packetsQueue = new List<BasePacketDocument>(_maxQueueSize);
+            _statisticsQueue = new List<StatisticsDocument>(_maxQueueSize);
+        }
+
+        /// <summary>
+        /// Запуск подключения к серверам ElasticSearch и Redis.
+        /// </summary>
+        private void StartConnectingToServers()
+        {
             var redisConnection = _config.GetConnectionString("RedisConnection");
             if (string.IsNullOrEmpty(redisConnection))
             {
@@ -55,8 +64,8 @@ namespace PacketDataIndexer
                 Environment.Exit(1);
             }
 
-            _redisService = new RedisService(logger);
-            _redisTask = Task.Run(async () => { await _redisService.ConnectAsync(redisConnection); });
+            _redisService = new RedisService(_logger);
+            _redisTask = Task.Run(async () => await _redisService.ConnectAsync(redisConnection));
 
             var elasticConnection = _config.GetConnectionString("ElasticConnection");
             if (string.IsNullOrEmpty(elasticConnection))
@@ -72,11 +81,8 @@ namespace PacketDataIndexer
                 Environment.Exit(1);
             }
 
-            _elasticSearchService = new ElasticSearchService(logger);
-            _elasticTask = Task.Run(async () => { await _elasticSearchService.ConnectAsync(elasticConnection, authParams["Username"]!, authParams["Password"]!); });
-
-            _packetsQueue = new List<BasePacketDocument>(_maxQueueSize);
-            _statisticsQueue = new List<StatisticsDocument>(_maxQueueSize);
+            _elasticSearchService = new ElasticSearchService(_logger);
+            _elasticTask = Task.Run(async () => await _elasticSearchService.ConnectAsync(elasticConnection, authParams["Username"]!, authParams["Password"]!));
         }
 
         /// <summary>
@@ -86,17 +92,26 @@ namespace PacketDataIndexer
         /// <returns></returns>
         protected async override Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            StartConnectingToServers();
+
             await Task.WhenAll(_redisTask!, _elasticTask!);
 
             var agents = _redisService.GetRedisKeys(_config.GetConnectionString("RedisConnection")!, 6379);
             while (!agents.Any())
             {
+                int agentsReadDelay;
+                if (!int.TryParse(_config["AgentsReadDelay"], out agentsReadDelay))
+                {
+                    agentsReadDelay = 10;
+                    _logger.LogWarning(Warning.FailedToReadAgentsReadDelay); 
+                }
+
                 try
                 {
                     stoppingToken.ThrowIfCancellationRequested();
 
                     _logger.LogWarning(Warning.NoAgentsWereFound);
-                    await Task.Delay(10000);
+                    await Task.Delay(TimeSpan.FromSeconds(agentsReadDelay));
                     agents = _redisService.GetRedisKeys(_config.GetConnectionString("RedisConnection")!, 6379);
                 }
                 catch (OperationCanceledException)
@@ -119,7 +134,7 @@ namespace PacketDataIndexer
                 _logger.LogWarning(Warning.FailedToReadStreamTTL);
             }
 
-            _clearingTask = Task.Run(() => _redisService.ClearRedisStreamAsync(timeout, ttl, agents, stoppingToken));
+            _clearingTask = Task.Run(async () => await _redisService.ClearRedisStreamAsync(timeout, ttl, agents, stoppingToken));
 
             int streamCount;
             if (!int.TryParse(_config["StreamCount"], out streamCount))
@@ -150,7 +165,7 @@ namespace PacketDataIndexer
                             while (entries.Length == 0)
                             {
                                 _logger.LogWarning(Warning.StreamIsEmpty, agent);
-                                await Task.Delay(TimeSpan.FromSeconds(10));
+                                await Task.Delay(TimeSpan.FromSeconds(streamReadDelay));
                                 entries = await _redisService.ReadStreamAsync(agent, offset, streamCount);
                             }
 
@@ -247,11 +262,10 @@ namespace PacketDataIndexer
         /// <summary>
         /// Фомирование и индексация документа с пакетом сетевого уровня.
         /// </summary>
-        /// <param name="networkId"></param>
-        /// <param name="transportId"></param>
-        /// <param name="agent"></param>
-        /// <param name="ipv4"></param>
-        /// <param name="stoppingToken"></param>
+        /// <param name="networkId">Идентификатор пакета сетевого уровня.</param>
+        /// <param name="transportId">Идентификатор пакета транспортного уровня.</param>
+        /// <param name="agent">Агент.</param>
+        /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
         private async Task HandleNetworkAsync(object network, Guid networkId, Guid? transportId, RedisKey agent, CancellationToken stoppingToken)
         {
@@ -324,16 +338,15 @@ namespace PacketDataIndexer
         /// <summary>
         /// Фомирование и индексация документа с пакетом траспортного уровня.
         /// </summary>
-        /// <param name="transport"></param>
-        /// <param name="transportId"></param>
-        /// <param name="networkId"></param>
-        /// <param name="agent"></param>
-        /// <param name="stoppingToken"></param>
+        /// <param name="transport">Пакет транспортного уровня.</param>
+        /// <param name="transportId">Идентификатор пакета транспортного уровня.</param>
+        /// <param name="networkId">Идентификатор пакеты сетевого уровня.</param>
+        /// <param name="agent">Агент.</param>
+        /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
         private async Task HandleTransportAsync(object transport, Guid transportId, Guid? networkId, RedisKey agent, CancellationToken stoppingToken)
         {
             var document = NetworkHandler.GenerateTransportDocument(transport, transportId, networkId, agent.ToString());
-
             if (document == null) return;
 
             if (_packetsQueue.Count < _maxQueueSize)

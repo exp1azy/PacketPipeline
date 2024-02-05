@@ -120,6 +120,9 @@
   <data name="AnErrorOccuredWhileIndexing" xml:space="preserve">
     <value>Произошла ошибка при индексации данных в ElasticSearch: {0}</value>
   </data>
+  <data name="FailedToReadAgentsReadDelay" xml:space="preserve">
+    <value>Не удалось прочитать AgentsReadDelay из файла конфигурации appsettings.json. Установлено значение "10"</value>
+  </data>
   <data name="FailedToReadClearTimeout" xml:space="preserve">
     <value>Не удалось прочитать ClearTimeout из файла конфигурации. Установлено значение "60"</value>
   </data>
