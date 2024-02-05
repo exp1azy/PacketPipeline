@@ -79,7 +79,7 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать ClearTimeout из файла конфигурации. Установлено значение &quot;60&quot;.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать ClearTimeout из файла конфигурации appsettings.json. Установлено значение &quot;60&quot;.
         /// </summary>
         internal static string FailedToReadClearTimeout {
             get {
@@ -88,7 +88,16 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать LastRedisValueIndex из файла конфигурации. Установлено значение &quot;0&quot;.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать ElasticConnectionDelay из файла конфигурации appsettings.json. Установлено значение &quot;10&quot;.
+        /// </summary>
+        internal static string FailedToReadElasticConnectionDelay {
+            get {
+                return ResourceManager.GetString("FailedToReadElasticConnectionDelay", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать LastRedisValueIndex из файла конфигурации appsettings.json. Установлено значение &quot;0&quot;.
         /// </summary>
         internal static string FailedToReadLastRedisValueIndex {
             get {
@@ -97,7 +106,7 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать MaxQueueSize из файла appsettings.json.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать MaxQueueSize из файла конфигурации appsettings.json.
         /// </summary>
         internal static string FailedToReadMaxQueueSize {
             get {
@@ -106,7 +115,16 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamCount из файла конфигурации. Установлено значение &quot;500&quot;.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать RedisConnectionDelay из файла конфигурации appsettings.json. Установлено значение &quot;10&quot;.
+        /// </summary>
+        internal static string FailedToReadRedisConnectionDelay {
+            get {
+                return ResourceManager.GetString("FailedToReadRedisConnectionDelay", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamCount из файла конфигурации appsettings.json. Установлено значение &quot;500&quot;.
         /// </summary>
         internal static string FailedToReadStreamCount {
             get {
@@ -115,7 +133,7 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamReadDelay из файла appsettings.json. Установлено значение &quot;10&quot;.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamReadDelay из файла конфигурации appsettings.json. Установлено значение &quot;10&quot;.
         /// </summary>
         internal static string FailedToReadStreamReadDelay {
             get {
@@ -124,7 +142,7 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamTTL из файла конфигурации. Установлено значение &quot;12&quot;.
+        ///   Ищет локализованную строку, похожую на Не удалось прочитать StreamTTL из файла конфигурации appsettings.json. Установлено значение &quot;12&quot;.
         /// </summary>
         internal static string FailedToReadStreamTTL {
             get {

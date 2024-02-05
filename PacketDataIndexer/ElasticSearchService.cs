@@ -29,7 +29,7 @@ namespace PacketDataIndexer
         /// <param name="username">Имя пользователя.</param>
         /// <param name="password">Пароль.</param>
         /// <returns></returns>
-        public async Task ConnectAsync(string connectionString, string username, string password)
+        public async Task ConnectAsync(string connectionString, string username, string password, int delay = 10)
         {
             while (true)
             {
@@ -46,7 +46,7 @@ namespace PacketDataIndexer
                 catch
                 {
                     _logger.LogError(Error.NoConnectionToElastic);
-                    await Task.Delay(5000);
+                    await Task.Delay(TimeSpan.FromSeconds(delay));
                 }
             }
         }

@@ -4,7 +4,6 @@ using PacketDataIndexer.Entities.ES;
 using PacketDataIndexer.Resources;
 using PacketDotNet;
 using StackExchange.Redis;
-using System.Collections.Concurrent;
 using Error = PacketDataIndexer.Resources.Error;
 
 namespace PacketDataIndexer
@@ -55,7 +54,7 @@ namespace PacketDataIndexer
         /// <summary>
         /// Запуск подключения к серверам ElasticSearch и Redis.
         /// </summary>
-        private void StartConnectingToServers()
+        private void StartConnectingToServers(int redisConnectionDelay, int elasticConnectionDelay)
         {
             var redisConnection = _config.GetConnectionString("RedisConnection");
             if (string.IsNullOrEmpty(redisConnection))
@@ -65,7 +64,8 @@ namespace PacketDataIndexer
             }
 
             _redisService = new RedisService(_logger);
-            _redisTask = Task.Run(async () => await _redisService.ConnectAsync(redisConnection));
+            _redisTask = Task.Run(async () => 
+                await _redisService.ConnectAsync(redisConnection, redisConnectionDelay));
 
             var elasticConnection = _config.GetConnectionString("ElasticConnection");
             if (string.IsNullOrEmpty(elasticConnection))
@@ -82,7 +82,8 @@ namespace PacketDataIndexer
             }
 
             _elasticSearchService = new ElasticSearchService(_logger);
-            _elasticTask = Task.Run(async () => await _elasticSearchService.ConnectAsync(elasticConnection, authParams["Username"]!, authParams["Password"]!));
+            _elasticTask = Task.Run(async () => 
+                await _elasticSearchService.ConnectAsync(elasticConnection, authParams["Username"]!, authParams["Password"]!, elasticConnectionDelay));
         }
 
         /// <summary>
@@ -92,7 +93,21 @@ namespace PacketDataIndexer
         /// <returns></returns>
         protected async override Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            StartConnectingToServers();
+            int redisConnectionDelay;
+            if (!int.TryParse(_config["RedisConnectionDelay"], out redisConnectionDelay))
+            {
+                redisConnectionDelay = 10;
+                _logger.LogWarning(Warning.FailedToReadRedisConnectionDelay);
+            }
+
+            int elasticConnectionDelay;
+            if (!int.TryParse(_config["ElasticConnectionDelay"], out elasticConnectionDelay))
+            {
+                elasticConnectionDelay = 10;
+                _logger.LogWarning(Warning.FailedToReadElasticConnectionDelay);
+            }
+
+            StartConnectingToServers(redisConnectionDelay, elasticConnectionDelay);
 
             await Task.WhenAll(_redisTask!, _elasticTask!);
 

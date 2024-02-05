@@ -28,7 +28,7 @@ namespace PacketDataIndexer
         /// </summary>
         /// <param name="connectionString">Строка подключения.</param>
         /// <returns></returns>
-        public async Task ConnectAsync(string connectionString)
+        public async Task ConnectAsync(string connectionString, int delay = 10)
         {
             while (true)
             {
@@ -41,7 +41,7 @@ namespace PacketDataIndexer
                 catch
                 {
                     _logger.LogError(Error.NoConnectionToRedis);
-                    await Task.Delay(5000);
+                    await Task.Delay(TimeSpan.FromSeconds(delay));
                 }
             }
         }

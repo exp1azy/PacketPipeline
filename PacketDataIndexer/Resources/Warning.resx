@@ -124,22 +124,28 @@
     <value>Не удалось прочитать AgentsReadDelay из файла конфигурации appsettings.json. Установлено значение "10"</value>
   </data>
   <data name="FailedToReadClearTimeout" xml:space="preserve">
-    <value>Не удалось прочитать ClearTimeout из файла конфигурации. Установлено значение "60"</value>
+    <value>Не удалось прочитать ClearTimeout из файла конфигурации appsettings.json. Установлено значение "60"</value>
+  </data>
+  <data name="FailedToReadElasticConnectionDelay" xml:space="preserve">
+    <value>Не удалось прочитать ElasticConnectionDelay из файла конфигурации appsettings.json. Установлено значение "10"</value>
   </data>
   <data name="FailedToReadLastRedisValueIndex" xml:space="preserve">
-    <value>Не удалось прочитать LastRedisValueIndex из файла конфигурации. Установлено значение "0"</value>
+    <value>Не удалось прочитать LastRedisValueIndex из файла конфигурации appsettings.json. Установлено значение "0"</value>
   </data>
   <data name="FailedToReadMaxQueueSize" xml:space="preserve">
-    <value>Не удалось прочитать MaxQueueSize из файла appsettings.json</value>
+    <value>Не удалось прочитать MaxQueueSize из файла конфигурации appsettings.json</value>
+  </data>
+  <data name="FailedToReadRedisConnectionDelay" xml:space="preserve">
+    <value>Не удалось прочитать RedisConnectionDelay из файла конфигурации appsettings.json. Установлено значение "10"</value>
   </data>
   <data name="FailedToReadStreamCount" xml:space="preserve">
-    <value>Не удалось прочитать StreamCount из файла конфигурации. Установлено значение "500"</value>
+    <value>Не удалось прочитать StreamCount из файла конфигурации appsettings.json. Установлено значение "500"</value>
   </data>
   <data name="FailedToReadStreamReadDelay" xml:space="preserve">
-    <value>Не удалось прочитать StreamReadDelay из файла appsettings.json. Установлено значение "10"</value>
+    <value>Не удалось прочитать StreamReadDelay из файла конфигурации appsettings.json. Установлено значение "10"</value>
   </data>
   <data name="FailedToReadStreamTTL" xml:space="preserve">
-    <value>Не удалось прочитать StreamTTL из файла конфигурации. Установлено значение "12"</value>
+    <value>Не удалось прочитать StreamTTL из файла конфигурации appsettings.json. Установлено значение "12"</value>
   </data>
   <data name="NoAgentsWereFound" xml:space="preserve">
     <value>Не удалось получить агентов. Вероятно, ни один из агентов не взаимодействует с Redis и его потоками. Проверьте работу службы на устройствах</value>
