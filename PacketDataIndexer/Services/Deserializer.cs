@@ -4,6 +4,9 @@ using StackExchange.Redis;
 
 namespace PacketDataIndexer.Services
 {
+    /// <summary>
+    /// Десериализатор записей потока Redis. 
+    /// </summary>
     internal class Deserializer
     {
         /// Распаковка и десериализация данных о <see cref="Statistics"/> из Redis.

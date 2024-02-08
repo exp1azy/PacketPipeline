@@ -30,8 +30,21 @@ namespace PacketDataIndexer
 
         private List<BasePacketDocument> _packetsQueue;
         private List<StatisticsDocument> _statisticsQueue;
-        private int _maxQueueSize;
 
+        private int _maxQueueSize;
+        private int _streamClearTimeout;
+        private int _streamTTL;
+        private string? _redisConnectionString;
+        private int _redisConnectionDelay;
+        private int _redisPort;
+        private int _redisAgentsReadDelay;
+        private int _streamCount;
+        private int _streamReadDelay;
+        private string? _elasticConnectionString;
+        private string? _elasticUsername;
+        private string? _elasticPassword;
+        private int _elasticConnectionDelay;
+        
         /// <summary>
         /// Конструктор.
         /// </summary>
@@ -41,16 +54,6 @@ namespace PacketDataIndexer
         {
             _config = config;
             _logger = logger;
-
-            if (int.TryParse(_config["MaxQueueSize"], out int maxQueueSize))
-            {
-                _maxQueueSize = maxQueueSize;
-            }
-            else
-            {
-                _maxQueueSize = 50;
-                _logger.LogWarning(Warning.FailedToReadMaxQueueSize);
-            }
 
             _redisService = new RedisService(_logger);
             _elasticSearchService = new ElasticSearchService(_logger);
@@ -64,23 +67,27 @@ namespace PacketDataIndexer
             _statisticsQueue = new List<StatisticsDocument>(_maxQueueSize);
         }
 
-        /// <summary>
-        /// Запуск подключения к серверам ElasticSearch и Redis.
-        /// </summary>
-        private void StartConnectingToServers(int redisConnectionDelay, int elasticConnectionDelay)
+        private void CheckConfiguration()
         {
-            var redisConnection = _config.GetConnectionString("RedisConnection");
-            if (string.IsNullOrEmpty(redisConnection))
+            if (int.TryParse(_config["MaxQueueSize"], out int maxQueueSize))
+            {
+                _maxQueueSize = maxQueueSize;
+            }
+            else
+            {
+                _maxQueueSize = 50;
+                _logger.LogWarning(Warning.FailedToReadMaxQueueSize);
+            }
+
+            _redisConnectionString = _config.GetConnectionString("RedisConnection");
+            if (string.IsNullOrEmpty(_redisConnectionString))
             {
                 _logger.LogError(Error.FailedToReadRedisConnectionString);
                 Environment.Exit(1);
             }
 
-            _redisTask = Task.Run(async () =>
-                await _redisService.ConnectAsync(redisConnection, redisConnectionDelay));
-
-            var elasticConnection = _config.GetConnectionString("ElasticConnection");
-            if (string.IsNullOrEmpty(elasticConnection))
+            _elasticConnectionString = _config.GetConnectionString("ElasticConnection");
+            if (string.IsNullOrEmpty(_elasticConnectionString))
             {
                 _logger?.LogError(Error.FailedToReadElasticConnectionString);
                 Environment.Exit(1);
@@ -92,9 +99,68 @@ namespace PacketDataIndexer
                 _logger.LogError(Error.FailedToReadESAuthParams);
                 Environment.Exit(1);
             }
+            _elasticUsername = authParams["Username"];
+            _elasticPassword = authParams["Password"];
+
+            if (!int.TryParse(_config["RedisConnectionDelay"], out _redisConnectionDelay))
+            {
+                _redisConnectionDelay = 10;
+                _logger.LogWarning(Warning.FailedToReadRedisConnectionDelay);
+            }
+
+            if (!int.TryParse(_config["ElasticConnectionDelay"], out _elasticConnectionDelay))
+            {
+                _elasticConnectionDelay = 10;
+                _logger.LogWarning(Warning.FailedToReadElasticConnectionDelay);
+            }
+
+            if (!int.TryParse(_config["RedisPort"], out _redisPort))
+            {
+                _logger.LogError(Error.FailedToReadRedisPort);
+                Environment.Exit(1);
+            }
+
+            if (!int.TryParse(_config["AgentsReadDelay"], out _redisAgentsReadDelay))
+            {
+                _redisAgentsReadDelay = 10;
+                _logger.LogWarning(Warning.FailedToReadAgentsReadDelay);
+            }
+
+            if (!int.TryParse(_config["ClearTimeout"], out _streamClearTimeout))
+            {
+                _streamClearTimeout = 60;
+                _logger.LogWarning(Warning.FailedToReadClearTimeout);
+            }
+
+            if (!int.TryParse(_config["StreamTTL"], out _streamTTL))
+            {
+                _streamTTL = 12;
+                _logger.LogWarning(Warning.FailedToReadStreamTTL);
+            }
+
+            if (!int.TryParse(_config["StreamCount"], out _streamCount))
+            {
+                _streamCount = 500;
+                _logger.LogWarning(Warning.FailedToReadStreamCount);
+            }
+
+            if (!int.TryParse(_config["StreamReadDelay"], out _streamReadDelay))
+            {
+                _streamReadDelay = 10;
+                _logger.LogWarning(Warning.FailedToReadStreamReadDelay);
+            }
+        }
+
+        /// <summary>
+        /// Запуск подключения к серверам ElasticSearch и Redis.
+        /// </summary>
+        private void StartConnectingToServers()
+        {
+            _redisTask = Task.Run(async () =>
+                await _redisService.ConnectAsync(_redisConnectionString!, _redisConnectionDelay));
 
             _elasticTask = Task.Run(async () =>
-                await _elasticSearchService.ConnectAsync(elasticConnection, authParams["Username"]!, authParams["Password"]!, elasticConnectionDelay));
+                await _elasticSearchService.ConnectAsync(_elasticConnectionString!, _elasticUsername!, _elasticPassword!, _elasticConnectionDelay));
         }
 
         /// <summary>
@@ -104,47 +170,21 @@ namespace PacketDataIndexer
         /// <returns></returns>
         protected async override Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            int redisConnectionDelay;
-            if (!int.TryParse(_config["RedisConnectionDelay"], out redisConnectionDelay))
-            {
-                redisConnectionDelay = 10;
-                _logger.LogWarning(Warning.FailedToReadRedisConnectionDelay);
-            }
-
-            int elasticConnectionDelay;
-            if (!int.TryParse(_config["ElasticConnectionDelay"], out elasticConnectionDelay))
-            {
-                elasticConnectionDelay = 10;
-                _logger.LogWarning(Warning.FailedToReadElasticConnectionDelay);
-            }
-
-            StartConnectingToServers(redisConnectionDelay, elasticConnectionDelay);
+            CheckConfiguration();
+            StartConnectingToServers();
 
             await Task.WhenAll(_redisTask!, _elasticTask!);
 
-            if (!int.TryParse(_config["RedisPort"], out int port))
-            {
-                _logger.LogError(Error.FailedToReadRedisPort);
-                Environment.Exit(1);
-            }
-
-            var agents = _redisService.GetRedisKeys(_config.GetConnectionString("RedisConnection")!, port);
+            var agents = _redisService.GetRedisKeys(_config.GetConnectionString("RedisConnection")!, _redisPort);
             while (!agents.Any())
-            {
-                int agentsReadDelay;
-                if (!int.TryParse(_config["AgentsReadDelay"], out agentsReadDelay))
-                {
-                    agentsReadDelay = 10;
-                    _logger.LogWarning(Warning.FailedToReadAgentsReadDelay);
-                }
-
+            { 
                 try
                 {
                     stoppingToken.ThrowIfCancellationRequested();
 
                     _logger.LogWarning(Warning.NoAgentsWereFound);
-                    await Task.Delay(TimeSpan.FromSeconds(agentsReadDelay));
-                    agents = _redisService.GetRedisKeys(_config.GetConnectionString("RedisConnection")!, 6379);
+                    await Task.Delay(TimeSpan.FromSeconds(_redisAgentsReadDelay));
+                    agents = _redisService.GetRedisKeys(_config.GetConnectionString("RedisConnection")!, _redisPort);
                 }
                 catch (OperationCanceledException)
                 {
@@ -152,35 +192,7 @@ namespace PacketDataIndexer
                 }
             }
 
-            int timeout;
-            if (!int.TryParse(_config["ClearTimeout"], out timeout))
-            {
-                timeout = 60;
-                _logger.LogWarning(Warning.FailedToReadClearTimeout);
-            }
-
-            int ttl;
-            if (!int.TryParse(_config["StreamTTL"], out ttl))
-            {
-                ttl = 12;
-                _logger.LogWarning(Warning.FailedToReadStreamTTL);
-            }
-
-            _clearingTask = Task.Run(async () => await _redisService.ClearRedisStreamAsync(timeout, ttl, agents, stoppingToken));
-
-            int streamCount;
-            if (!int.TryParse(_config["StreamCount"], out streamCount))
-            {
-                streamCount = 500;
-                _logger.LogWarning(Warning.FailedToReadStreamCount);
-            }
-
-            int streamReadDelay;
-            if (!int.TryParse(_config["StreamReadDelay"], out streamReadDelay))
-            {
-                streamReadDelay = 10;
-                _logger.LogWarning(Warning.FailedToReadStreamReadDelay);
-            }
+            _clearingTask = Task.Run(async () => await _redisService.ClearRedisStreamAsync(_streamClearTimeout, _streamTTL, agents, stoppingToken));
 
             var tasks = new List<Task>();
 
@@ -193,12 +205,12 @@ namespace PacketDataIndexer
                     {
                         try
                         {
-                            var entries = await _redisService.ReadStreamAsync(agent, offset, streamCount);
+                            var entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
                             while (entries.Length == 0)
                             {
                                 _logger.LogWarning(Warning.StreamIsEmpty, agent);
-                                await Task.Delay(TimeSpan.FromSeconds(streamReadDelay));
-                                entries = await _redisService.ReadStreamAsync(agent, offset, streamCount);
+                                await Task.Delay(TimeSpan.FromSeconds(_streamReadDelay));
+                                entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
                             }
 
                             var rawPackets = _deserializer.GetDeserializedRawPackets(entries);

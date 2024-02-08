@@ -3,6 +3,9 @@ using PacketDataIndexer.Entities;
 
 namespace PacketDataIndexer.Services
 {
+    /// <summary>
+    /// Предоставляет логику обработки статистики по входящему сетевому трафику.
+    /// </summary>
     internal class StatisticsHandler
     {
         /// <summary>

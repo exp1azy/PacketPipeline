@@ -3,23 +3,26 @@ using PacketDotNet;
 
 namespace PacketDataIndexer.Interfaces
 {
+    /// <summary>
+    /// Предоставляет методы для обработки входящих пакетов.
+    /// </summary>
     internal interface INetwork
     {
         /// <summary>
-        /// Метод, извлекающий пакет.
+        /// Метод извлечения пакета.
         /// </summary>
         /// <param name="packet">Пакет.</param>
-        /// <returns>Извлеченный пакет сетевого уровня.</returns>
+        /// <returns>Извлеченный пакет.</returns>
         public object? Extract(Packet packet);
 
         /// <summary>
         /// Формирование документа <see cref="BasePacketDocument"/> для ElasticSearch.
         /// </summary>
-        /// <param name="packet">Неизвлеченный пакет.</param>
+        /// <param name="packet">Пакет.</param>
         /// <param name="transportId">Идентификатор для пакета транспортного уровня.</param>
         /// <param name="networkId">Идентификатор для пакета сетевого уровня.</param>
         /// <param name="agent">Агент.</param>
-        /// <returns>Извлеченный пакет.</returns>
+        /// <returns>Сформированный документ для ElasticSearch, содержащий пакет.</returns>
         public BasePacketDocument? GenerateDocument(object packet, Guid? transportId, Guid? networkId, string agent);
     }
 }
