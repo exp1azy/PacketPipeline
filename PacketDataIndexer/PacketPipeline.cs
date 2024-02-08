@@ -67,6 +67,9 @@ namespace PacketDataIndexer
             _statisticsQueue = new List<StatisticsDocument>(_maxQueueSize);
         }
 
+        /// <summary>
+        /// Проверка файла конфигурации.
+        /// </summary>
         private void CheckConfiguration()
         {
             if (int.TryParse(_config["MaxQueueSize"], out int maxQueueSize))

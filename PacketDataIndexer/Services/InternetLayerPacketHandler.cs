@@ -5,6 +5,9 @@ using PacketDotNet;
 
 namespace PacketDataIndexer.Services
 {
+    /// <summary>
+    /// Предоставляет логику обработки пакетов сетевого уровня модели OSI.
+    /// </summary>
     internal class InternetLayerPacketHandler : INetwork
     {
         public object? Extract(Packet packet) =>
