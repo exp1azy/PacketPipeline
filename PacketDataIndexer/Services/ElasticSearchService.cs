@@ -3,7 +3,7 @@ using Nest;
 using PacketDataIndexer.Resources;
 using Error = PacketDataIndexer.Resources.Error;
 
-namespace PacketDataIndexer
+namespace PacketDataIndexer.Services
 {
     /// <summary>
     /// Сервис, представляющий логику для взаимодействия с сервером ElasticSearch.

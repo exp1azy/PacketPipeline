@@ -3,7 +3,7 @@ using PacketDataIndexer.Entities;
 using PacketDataIndexer.Resources;
 using StackExchange.Redis;
 
-namespace PacketDataIndexer
+namespace PacketDataIndexer.Services
 {
     /// <summary>
     /// Сервис, представляющий логику для взаимодействия с сервером Redis.
@@ -20,7 +20,7 @@ namespace PacketDataIndexer
         /// <param name="logger">Логи.</param>
         public RedisService(ILogger<PacketPipeline> logger)
         {
-            _logger = logger;          
+            _logger = logger;
         }
 
         /// <summary>
@@ -53,7 +53,7 @@ namespace PacketDataIndexer
         /// <param name="position">Позиция.</param>
         /// <param name="count">Количество.</param>
         /// <returns>Массив элементов.</returns>
-        public async Task<StreamEntry[]> ReadStreamAsync(RedisKey key, RedisValue position, int count) => 
+        public async Task<StreamEntry[]> ReadStreamAsync(RedisKey key, RedisValue position, int count) =>
             await _redisDatabase.StreamReadAsync(key, position, count);
 
         /// <summary>

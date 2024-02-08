@@ -2,6 +2,7 @@
 using PacketDataIndexer.Entities;
 using PacketDataIndexer.Entities.ES;
 using PacketDataIndexer.Resources;
+using PacketDataIndexer.Services;
 using PacketDotNet;
 using StackExchange.Redis;
 using Error = PacketDataIndexer.Resources.Error;
@@ -16,8 +17,12 @@ namespace PacketDataIndexer
         private readonly IConfiguration _config;
         private readonly ILogger<PacketPipeline> _logger;
 
-        private ElasticSearchService _elasticSearchService;
-        private RedisService _redisService;
+        private readonly ElasticSearchService _elasticSearchService;
+        private readonly RedisService _redisService;
+        private readonly TransportLayerPacketHandler _transportHandler;
+        private readonly InternetLayerPacketHandler _internetHandler;
+        private readonly StatisticsHandler _statisticsHandler;
+        private readonly Deserializer _deserializer;
 
         private Task? _redisTask;
         private Task? _elasticTask;
@@ -47,6 +52,14 @@ namespace PacketDataIndexer
                 _logger.LogWarning(Warning.FailedToReadMaxQueueSize);
             }
 
+            _redisService = new RedisService(_logger);
+            _elasticSearchService = new ElasticSearchService(_logger);
+
+            _transportHandler = new TransportLayerPacketHandler();
+            _internetHandler = new InternetLayerPacketHandler();
+            _statisticsHandler = new StatisticsHandler();
+            _deserializer = new Deserializer();
+
             _packetsQueue = new List<BasePacketDocument>(_maxQueueSize);
             _statisticsQueue = new List<StatisticsDocument>(_maxQueueSize);
         }
@@ -63,8 +76,7 @@ namespace PacketDataIndexer
                 Environment.Exit(1);
             }
 
-            _redisService = new RedisService(_logger);
-            _redisTask = Task.Run(async () => 
+            _redisTask = Task.Run(async () =>
                 await _redisService.ConnectAsync(redisConnection, redisConnectionDelay));
 
             var elasticConnection = _config.GetConnectionString("ElasticConnection");
@@ -81,8 +93,7 @@ namespace PacketDataIndexer
                 Environment.Exit(1);
             }
 
-            _elasticSearchService = new ElasticSearchService(_logger);
-            _elasticTask = Task.Run(async () => 
+            _elasticTask = Task.Run(async () =>
                 await _elasticSearchService.ConnectAsync(elasticConnection, authParams["Username"]!, authParams["Password"]!, elasticConnectionDelay));
         }
 
@@ -124,7 +135,7 @@ namespace PacketDataIndexer
                 if (!int.TryParse(_config["AgentsReadDelay"], out agentsReadDelay))
                 {
                     agentsReadDelay = 10;
-                    _logger.LogWarning(Warning.FailedToReadAgentsReadDelay); 
+                    _logger.LogWarning(Warning.FailedToReadAgentsReadDelay);
                 }
 
                 try
@@ -138,7 +149,7 @@ namespace PacketDataIndexer
                 catch (OperationCanceledException)
                 {
                     Environment.Exit(0);
-                }                            
+                }
             }
 
             int timeout;
@@ -176,7 +187,7 @@ namespace PacketDataIndexer
             foreach (var agent in agents)
             {
                 tasks.Add(Task.Run(async () =>
-                {                 
+                {
                     var offset = StreamPosition.Beginning;
                     while (!stoppingToken.IsCancellationRequested)
                     {
@@ -190,14 +201,14 @@ namespace PacketDataIndexer
                                 entries = await _redisService.ReadStreamAsync(agent, offset, streamCount);
                             }
 
-                            var rawPackets = NetworkHandler.GetDeserializedRawPackets(entries);
+                            var rawPackets = _deserializer.GetDeserializedRawPackets(entries);
                             foreach (var rp in rawPackets)
                             {
                                 var packet = Packet.ParsePacket((LinkLayers)rp!.LinkLayerType, rp.Data);
                                 await GenerateAndIndexNetworkAsync(packet, agent, stoppingToken);
                             }
 
-                            var statistics = NetworkHandler.GetDeserializedStatistics(entries);
+                            var statistics = _deserializer.GetDeserializedStatistics(entries);
                             foreach (var s in statistics)
                             {
                                 await GenerateAndIndexStatisticsAsync(s!, agent, stoppingToken);
@@ -214,15 +225,15 @@ namespace PacketDataIndexer
                             _logger.LogError(Error.Unexpected, ex.Message);
                             Environment.Exit(1);
                         }
-                    }                   
+                    }
                 }));
             }
-            
+
             await Task.WhenAll(tasks);
 
             _clearingTask!.Dispose();
             _clearingTask = null;
-        }      
+        }
 
         /// <summary>
         /// Метод, необходимый для индексации пакетов.
@@ -233,18 +244,18 @@ namespace PacketDataIndexer
         /// <returns></returns>
         private async Task GenerateAndIndexNetworkAsync(Packet packet, RedisKey agent, CancellationToken stoppingToken)
         {
-            object? transport = NetworkHandler.GetTransport(packet);
-            object? network = NetworkHandler.GetNetwork(packet);
+            var transport = _transportHandler.Extract(packet);
+            var internet = _internetHandler.Extract(packet);
 
-            if (network == null && transport == null) return;
-            
+            if (internet == null && transport == null) return;
+
             Guid? transportId = transport == null ? null : Guid.NewGuid();
-            Guid? networkId = network == null ? null : Guid.NewGuid();
-            
-            if (network != null)
-                await HandleNetworkAsync(network, (Guid)networkId!, transportId, agent, stoppingToken);
+            Guid? internetId = internet == null ? null : Guid.NewGuid();
+
+            if (internet != null)
+                await HandleInternetAsync(internet, (Guid)internetId!, transportId, agent, stoppingToken);
             if (transport != null)
-                await HandleTransportAsync(transport, (Guid)transportId!, networkId, agent, stoppingToken);         
+                await HandleTransportAsync(transport, (Guid)transportId!, internetId, agent, stoppingToken);
         }
 
         /// <summary>
@@ -256,7 +267,7 @@ namespace PacketDataIndexer
         /// <returns></returns>
         private async Task GenerateAndIndexStatisticsAsync(Statistics statistics, RedisKey agent, CancellationToken stoppingToken)
         {
-            var document = NetworkHandler.GenerateStatisticsDocument(statistics, agent.ToString());
+            var document = _statisticsHandler.GenerateStatisticsDocument(statistics, agent.ToString());
 
             if (_statisticsQueue.Count < _maxQueueSize)
             {
@@ -283,16 +294,16 @@ namespace PacketDataIndexer
         /// <summary>
         /// Фомирование и индексация документа с пакетом сетевого уровня.
         /// </summary>
-        /// <param name="networkId">Идентификатор пакета сетевого уровня.</param>
+        /// <param name="internetId">Идентификатор пакета сетевого уровня.</param>
         /// <param name="transportId">Идентификатор пакета транспортного уровня.</param>
         /// <param name="agent">Агент.</param>
         /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
-        private async Task HandleNetworkAsync(object network, Guid networkId, Guid? transportId, RedisKey agent, CancellationToken stoppingToken)
+        private async Task HandleInternetAsync(object internet, Guid internetId, Guid? transportId, RedisKey agent, CancellationToken stoppingToken)
         {
-            var document = NetworkHandler.GenerateNetworkDocument(network, networkId, transportId, agent.ToString());
+            var document = _internetHandler.GenerateDocument(internet, internetId, transportId, agent.ToString());
             if (document == null) return;
-            
+
             if (_packetsQueue.Count < _maxQueueSize)
             {
                 _packetsQueue.Add(document);
@@ -301,7 +312,7 @@ namespace PacketDataIndexer
             {
                 var bulkDescriptor = new BulkDescriptor();
 
-                foreach (var d in _packetsQueue.Where(p => p.Model == "Network"))
+                foreach (var d in _packetsQueue.Where(p => p.Model == OSIModel.Internet.ToString()))
                 {
                     if (d is IPv4Document)
                     {
@@ -352,7 +363,7 @@ namespace PacketDataIndexer
 
                 await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
 
-                _packetsQueue.RemoveAll(p => p.Model == "Network");
+                _packetsQueue.RemoveAll(p => p.Model == OSIModel.Internet.ToString());
             }
         }
 
@@ -361,13 +372,13 @@ namespace PacketDataIndexer
         /// </summary>
         /// <param name="transport">Пакет транспортного уровня.</param>
         /// <param name="transportId">Идентификатор пакета транспортного уровня.</param>
-        /// <param name="networkId">Идентификатор пакеты сетевого уровня.</param>
+        /// <param name="internetId">Идентификатор пакеты сетевого уровня.</param>
         /// <param name="agent">Агент.</param>
         /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
-        private async Task HandleTransportAsync(object transport, Guid transportId, Guid? networkId, RedisKey agent, CancellationToken stoppingToken)
+        private async Task HandleTransportAsync(object transport, Guid transportId, Guid? internetId, RedisKey agent, CancellationToken stoppingToken)
         {
-            var document = NetworkHandler.GenerateTransportDocument(transport, transportId, networkId, agent.ToString());
+            var document = _transportHandler.GenerateDocument(transport, transportId, internetId, agent.ToString());
             if (document == null) return;
 
             if (_packetsQueue.Count < _maxQueueSize)
@@ -378,7 +389,7 @@ namespace PacketDataIndexer
             {
                 var bulkDescriptor = new BulkDescriptor();
 
-                foreach (var d in _packetsQueue.Where(p => p.Model == "Transport"))
+                foreach (var d in _packetsQueue.Where(p => p.Model == OSIModel.Transport.ToString()))
                 {
                     if (d is TcpDocument)
                     {
@@ -388,7 +399,7 @@ namespace PacketDataIndexer
                             .Id(doc.Id)
                             .Index("tcp")
                         );
-                    }  
+                    }
                     else if (d is UdpDocument)
                     {
                         var doc = (UdpDocument)d;
@@ -402,7 +413,7 @@ namespace PacketDataIndexer
 
                 await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
 
-                _packetsQueue.RemoveAll(p => p.Model == "Transport");
+                _packetsQueue.RemoveAll(p => p.Model == OSIModel.Transport.ToString());
             }
         }
     }

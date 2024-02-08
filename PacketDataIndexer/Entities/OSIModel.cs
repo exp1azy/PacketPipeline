@@ -2,7 +2,7 @@
 {
     internal enum OSIModel
     {
-        Network = 0,
+        Internet = 0,
         Transport = 1
     }
 }

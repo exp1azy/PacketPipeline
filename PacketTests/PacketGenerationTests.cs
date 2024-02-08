@@ -15,7 +15,7 @@ namespace PacketTests
             var extractedPacket = GetTransport(packet);
 
             Assert.NotNull(extractedPacket);
-            Assert.True(extractedPacket.GetType() == typeof(TcpPacket));
+            Assert.True(extractedPacket is TcpPacket);
         }
 
         [Fact]
@@ -26,7 +26,7 @@ namespace PacketTests
             var extractedPacket = GetTransport(packet);
 
             Assert.NotNull(extractedPacket);
-            Assert.True(extractedPacket.GetType() == typeof(UdpPacket));
+            Assert.True(extractedPacket is UdpPacket);
         }
 
         [Fact]
@@ -34,10 +34,10 @@ namespace PacketTests
         {
             var bytes = GenerateICMPv4();
             var packet = Packet.ParsePacket(LinkLayers.Ethernet, bytes);
-            var extractedPacket = GetNetwork(packet);
+            var extractedPacket = GetInternet(packet);
 
             Assert.NotNull(extractedPacket);
-            Assert.True(extractedPacket.GetType() == typeof(IcmpV4Packet));
+            Assert.True(extractedPacket is IcmpV4Packet);
         }
 
         [Fact]
@@ -45,16 +45,16 @@ namespace PacketTests
         {
             var bytes = GenerateIGMPv2();
             var packet = Packet.ParsePacket(LinkLayers.Ethernet, bytes);
-            var extractedPacket = GetNetwork(packet);
+            var extractedPacket = GetInternet(packet);
 
             Assert.NotNull(extractedPacket);
-            Assert.True(extractedPacket.GetType() == typeof(IgmpV2Packet));
+            Assert.True(extractedPacket is IgmpV2Packet);
         }
 
         private dynamic GetTransport(Packet packet) => 
             packet.Extract<TcpPacket>() ?? (dynamic)packet.Extract<UdpPacket>();
 
-        private dynamic GetNetwork(Packet packet) =>
+        private dynamic GetInternet(Packet packet) =>
             packet.Extract<IcmpV4Packet>() ?? packet.Extract<IcmpV6Packet>() ??
             packet.Extract<IgmpV2Packet>() ?? packet.Extract<IPv4Packet>() ?? (dynamic)packet.Extract<IPv6Packet>();
 
