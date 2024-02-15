@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
-using PacketDataIndexer.Entities;
 using PacketDataIndexer.Resources;
 using StackExchange.Redis;
+using WebSpectre.Shared;
 
 namespace PacketDataIndexer.Services
 {

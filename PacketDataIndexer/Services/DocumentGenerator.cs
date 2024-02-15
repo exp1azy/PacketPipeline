@@ -1,21 +1,91 @@
-﻿using PacketDataIndexer.Entities;
-using PacketDataIndexer.Entities.ES;
-using PacketDataIndexer.Interfaces;
-using PacketDotNet;
+﻿using PacketDotNet;
+using WebSpectre.Shared;
+using WebSpectre.Shared.ES;
 
 namespace PacketDataIndexer.Services
 {
     /// <summary>
     /// Предоставляет логику обработки пакетов сетевого уровня модели OSI.
     /// </summary>
-    internal class InternetLayerPacketHandler : INetwork
+    public static class DocumentGenerator
     {
-        public object? Extract(Packet packet) =>
-            packet.Extract<IcmpV4Packet>() ?? packet.Extract<IcmpV6Packet>() ??
-            packet.Extract<IgmpV2Packet>() ?? packet.Extract<Ieee8021QPacket>() ??
-            packet.Extract<IPv4Packet>() ?? (object)packet.Extract<IPv6Packet>();
+        public static BasePacketDocument? GenerateTransportDocument(object packet, Guid? transportId, Guid? networkId, string agent)
+        {
+            var model = OSIModel.Transport.ToString();
 
-        public BasePacketDocument? GenerateDocument(object packet, Guid? transportId, Guid? networkId, string agent)
+            if (packet is TcpPacket)
+            {
+                TcpPacket tcp = (TcpPacket)packet;
+
+                return new TcpDocument
+                {
+                    Id = (Guid)transportId!,
+                    Nested = networkId,
+                    Agent = agent,
+                    Model = model,
+                    Acknowledgment = tcp.Acknowledgment,
+                    AcknowledgmentNumber = tcp.AcknowledgmentNumber,
+                    Bytes = tcp.Bytes,
+                    Checksum = tcp.Checksum,
+                    Color = tcp.Color,
+                    CongestionWindowReduced = tcp.CongestionWindowReduced,
+                    DataOffset = tcp.DataOffset,
+                    DestinationPort = tcp.DestinationPort,
+                    ExplicitCongestionNotificationEcho = tcp.ExplicitCongestionNotificationEcho,
+                    Finished = tcp.Finished,
+                    Flags = tcp.Flags,
+                    HasPayloadData = tcp.HasPayloadData,
+                    HasPayloadPacket = tcp.HasPayloadPacket,
+                    HeaderData = tcp.HeaderData,
+                    IsPayloadInitialized = tcp.IsPayloadInitialized,
+                    NonceSum = tcp.NonceSum,
+                    Options = tcp.Options,
+                    OptionsCollection = tcp.OptionsCollection == null ? null : tcp.OptionsCollection.Select(o => (TcpOption)o).ToList(),
+                    OptionsSegment = tcp.OptionsSegment.ActualBytes(),
+                    PayloadData = tcp.PayloadData,
+                    Push = tcp.Push,
+                    Reset = tcp.Reset,
+                    SequenceNumber = tcp.SequenceNumber,
+                    SourcePort = tcp.SourcePort,
+                    Synchronize = tcp.Synchronize,
+                    TotalPacketLength = tcp.TotalPacketLength,
+                    Urgent = tcp.Urgent,
+                    UrgentPointer = tcp.UrgentPointer,
+                    ValidChecksum = tcp.ValidChecksum,
+                    ValidTcpChecksum = tcp.ValidTcpChecksum,
+                    WindowSize = tcp.WindowSize,
+                };
+            }
+            else if (packet is UdpPacket)
+            {
+                UdpPacket udp = (UdpPacket)packet;
+
+                return new UdpDocument
+                {
+                    Id = (Guid)transportId!,
+                    Nested = networkId,
+                    Agent = agent,
+                    Model = model,
+                    Bytes = udp.Bytes,
+                    Checksum = udp.Checksum,
+                    Color = udp.Color,
+                    DestinationPort = udp.DestinationPort,
+                    HasPayloadData = udp.HasPayloadData,
+                    HasPayloadPacket = udp.HasPayloadPacket,
+                    HeaderData = udp.HeaderData,
+                    IsPayloadInitialized = udp.IsPayloadInitialized,
+                    Length = udp.Length,
+                    PayloadData = udp.PayloadData,
+                    SourcePort = udp.SourcePort,
+                    TotalPacketLength = udp.TotalPacketLength,
+                    ValidChecksum = udp.ValidChecksum,
+                    ValidUdpChecksum = udp.ValidUdpChecksum,
+                };
+            }
+            else return null;
+        }
+
+        public static BasePacketDocument? GenerateInternetDocument(object packet, Guid? transportId, Guid? networkId, string agent)
         {
             var model = OSIModel.Internet.ToString();
 
@@ -75,7 +145,7 @@ namespace PacketDataIndexer.Services
                     TotalPacketLength = ipv6.TotalPacketLength,
                     Color = ipv6.Color,
                     DestinationAddress = ipv6.DestinationAddress.ToString(),
-                    ExtensionHeaders = ipv6.ExtensionHeaders.Select(h => (Entities.ES.IPv6ExtensionHeader)h).ToList(),
+                    ExtensionHeaders = ipv6.ExtensionHeaders.Select(h => (WebSpectre.Shared.ES.IPv6ExtensionHeader)h).ToList(),
                     ExtensionHeadersLength = ipv6.ExtensionHeadersLength,
                     FlowLabel = ipv6.FlowLabel,
                     HeaderLength = ipv6.HeaderLength,

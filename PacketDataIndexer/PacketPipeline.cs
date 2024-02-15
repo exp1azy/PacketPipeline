@@ -1,10 +1,11 @@
 ﻿using Nest;
-using PacketDataIndexer.Entities;
-using PacketDataIndexer.Entities.ES;
 using PacketDataIndexer.Resources;
 using PacketDataIndexer.Services;
 using PacketDotNet;
 using StackExchange.Redis;
+using WebSpectre.Shared;
+using WebSpectre.Shared.ES;
+using WebSpectre.Shared.Services;
 using Error = PacketDataIndexer.Resources.Error;
 
 namespace PacketDataIndexer
@@ -19,10 +20,6 @@ namespace PacketDataIndexer
 
         private readonly ElasticSearchService _elasticSearchService;
         private readonly RedisService _redisService;
-        private readonly TransportLayerPacketHandler _transportHandler;
-        private readonly InternetLayerPacketHandler _internetHandler;
-        private readonly StatisticsHandler _statisticsHandler;
-        private readonly Deserializer _deserializer;
 
         private Task? _redisTask;
         private Task? _elasticTask;
@@ -57,11 +54,6 @@ namespace PacketDataIndexer
 
             _redisService = new RedisService(_logger);
             _elasticSearchService = new ElasticSearchService(_logger);
-
-            _transportHandler = new TransportLayerPacketHandler();
-            _internetHandler = new InternetLayerPacketHandler();
-            _statisticsHandler = new StatisticsHandler();
-            _deserializer = new Deserializer();
 
             _packetsQueue = new List<BasePacketDocument>(_maxQueueSize);
             _statisticsQueue = new List<StatisticsDocument>(_maxQueueSize);
@@ -216,14 +208,14 @@ namespace PacketDataIndexer
                                 entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
                             }
 
-                            var rawPackets = _deserializer.GetDeserializedRawPackets(entries);
+                            var rawPackets = Deserializer.GetDeserializedRawPackets(entries);
                             foreach (var rp in rawPackets)
                             {
                                 var packet = Packet.ParsePacket((LinkLayers)rp!.LinkLayerType, rp.Data);
                                 await GenerateAndIndexNetworkAsync(packet, agent, stoppingToken);
                             }
 
-                            var statistics = _deserializer.GetDeserializedStatistics(entries);
+                            var statistics = Deserializer.GetDeserializedStatistics(entries);
                             foreach (var s in statistics)
                             {
                                 await GenerateAndIndexStatisticsAsync(s!, agent, stoppingToken);
@@ -259,8 +251,8 @@ namespace PacketDataIndexer
         /// <returns></returns>
         private async Task GenerateAndIndexNetworkAsync(Packet packet, RedisKey agent, CancellationToken stoppingToken)
         {
-            var transport = _transportHandler.Extract(packet);
-            var internet = _internetHandler.Extract(packet);
+            var transport = PacketExtractor.ExtractTransport(packet);
+            var internet = PacketExtractor.ExtractInternet(packet);
 
             if (internet == null && transport == null) return;
 
@@ -282,7 +274,7 @@ namespace PacketDataIndexer
         /// <returns></returns>
         private async Task GenerateAndIndexStatisticsAsync(Statistics statistics, RedisKey agent, CancellationToken stoppingToken)
         {
-            var document = _statisticsHandler.GenerateStatisticsDocument(statistics, agent.ToString());
+            var document = StatisticsGenerator.GenerateStatisticsDocument(statistics, agent.ToString());
 
             if (_statisticsQueue.Count < _maxQueueSize)
             {
@@ -316,7 +308,7 @@ namespace PacketDataIndexer
         /// <returns></returns>
         private async Task HandleInternetAsync(object internet, Guid internetId, Guid? transportId, RedisKey agent, CancellationToken stoppingToken)
         {
-            var document = _internetHandler.GenerateDocument(internet, internetId, transportId, agent.ToString());
+            var document = DocumentGenerator.GenerateInternetDocument(internet, internetId, transportId, agent.ToString());
             if (document == null) return;
 
             if (_packetsQueue.Count < _maxQueueSize)
@@ -393,7 +385,7 @@ namespace PacketDataIndexer
         /// <returns></returns>
         private async Task HandleTransportAsync(object transport, Guid transportId, Guid? internetId, RedisKey agent, CancellationToken stoppingToken)
         {
-            var document = _transportHandler.GenerateDocument(transport, transportId, internetId, agent.ToString());
+            var document = DocumentGenerator.GenerateTransportDocument(transport, transportId, internetId, agent.ToString());
             if (document == null) return;
 
             if (_packetsQueue.Count < _maxQueueSize)
