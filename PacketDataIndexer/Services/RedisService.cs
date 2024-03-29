@@ -88,7 +88,7 @@ namespace PacketDataIndexer.Services
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(timeout));
+                await Task.Delay(TimeSpan.FromSeconds(timeout), stoppingToken);
 
                 foreach (var agent in agents)
                 {
@@ -100,7 +100,7 @@ namespace PacketDataIndexer.Services
                        .Where(e => JsonConvert.DeserializeObject<RawPacket>(e.Values.First().Value.ToString())!.Timeval.Date + TimeSpan.FromHours(ttl) < DateTime.UtcNow)
                        .Select(e => e.Id)
                        .ToArray();
-                    if (rawPacketsToDelete.Any())
+                    if (rawPacketsToDelete.Length != 0)
                         _ = _redisDatabase.StreamDeleteAsync(agent, rawPacketsToDelete);
 
                     var statisticsToDelete = entries
@@ -108,7 +108,7 @@ namespace PacketDataIndexer.Services
                         .Where(e => JsonConvert.DeserializeObject<Statistics>(e.Values.First().Value.ToString())!.Timeval.Date + TimeSpan.FromHours(ttl) < DateTime.UtcNow)
                         .Select(e => e.Id)
                         .ToArray();
-                    if (statisticsToDelete.Any())
+                    if (statisticsToDelete.Length != 0)
                         _ = _redisDatabase.StreamDeleteAsync(agent, statisticsToDelete);
                 }
             }

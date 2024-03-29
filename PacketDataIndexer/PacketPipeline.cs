@@ -322,15 +322,15 @@ namespace PacketDataIndexer
                 foreach (var d in _packetsQueue.Where(p => p.Model == OSIModel.Internet.ToString()))
                 {
                     if (d is IPv4Document ipv4)                   
-                        IndexIPv4(bulkDescriptor, ipv4);                 
+                        PacketIndexator.IndexIPv4(bulkDescriptor, ipv4);                 
                     else if (d is IPv6Document ipv6)
-                        IndexIPv6(bulkDescriptor, ipv6);
+                        PacketIndexator.IndexIPv6(bulkDescriptor, ipv6);
                     else if (d is IcmpV4Document icmpv4)
-                        IndexIcmpV4(bulkDescriptor, icmpv4);
+                        PacketIndexator.IndexIcmpV4(bulkDescriptor, icmpv4);
                     else if (d is IcmpV6Document icmpv6)
-                        IndexIcmpV6(bulkDescriptor, icmpv6);
+                        PacketIndexator.IndexIcmpV6(bulkDescriptor, icmpv6);
                     else if (d is IgmpV2Document igmp)
-                        IndexIgmpV2(bulkDescriptor, igmp);
+                        PacketIndexator.IndexIgmpV2(bulkDescriptor, igmp);
                 }
 
                 await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
@@ -338,66 +338,6 @@ namespace PacketDataIndexer
                 _packetsQueue.RemoveAll(p => p.Model == OSIModel.Internet.ToString());
             }
         }
-
-        /// <summary>
-        /// Индексация IPv4.
-        /// </summary>
-        /// <param name="bulkDescriptor"></param>
-        /// <param name="ipv4"></param>
-        private void IndexIPv4(BulkDescriptor bulkDescriptor, IPv4Document ipv4) => 
-            bulkDescriptor.Index<IPv4Document>(s => s
-                .Document(ipv4)
-                .Id(ipv4.Id)
-                .Index("ipv4")
-            );
-
-        /// <summary>
-        /// Индексация IPv6.
-        /// </summary>
-        /// <param name="bulkDescriptor"></param>
-        /// <param name="ipv6"></param>
-        private void IndexIPv6(BulkDescriptor bulkDescriptor, IPv6Document ipv6) =>
-            bulkDescriptor.Index<IPv6Document>(s => s
-                .Document(ipv6)
-                .Id(ipv6.Id)
-                .Index("ipv6")
-            );
-
-        /// <summary>
-        /// Индексация IcmpV4.
-        /// </summary>
-        /// <param name="bulkDescriptor"></param>
-        /// <param name="icmpv4"></param>
-        private void IndexIcmpV4(BulkDescriptor bulkDescriptor, IcmpV4Document icmpv4) =>
-            bulkDescriptor.Index<IcmpV4Document>(s => s
-                .Document(icmpv4)
-                .Id(icmpv4.Id)
-                .Index("icmpv4")
-            );
-
-        /// <summary>
-        /// Индексация IcmpV6.
-        /// </summary>
-        /// <param name="bulkDescriptor"></param>
-        /// <param name="icmpv6"></param>
-        private void IndexIcmpV6(BulkDescriptor bulkDescriptor, IcmpV6Document icmpv6) =>
-            bulkDescriptor.Index<IcmpV6Document>(s => s
-                .Document(icmpv6)
-                .Id(icmpv6.Id)
-                .Index("icmpv6")
-            );
-
-        /// <summary>
-        /// Индексация IgmpV2.
-        /// </summary>
-        /// <param name="bulkDescriptor"></param>
-        /// <param name="igmp"></param>
-        private void IndexIgmpV2(BulkDescriptor bulkDescriptor, IgmpV2Document igmp) =>
-            bulkDescriptor.Index<IgmpV2Document>(s => s
-                .Document(igmp)
-                .Id(igmp.Id)
-                .Index("igmp")
-            );
 
         /// <summary>
         /// Фомирование и индексация документа с пакетом траспортного уровня.
@@ -424,9 +364,9 @@ namespace PacketDataIndexer
                 foreach (var d in _packetsQueue.Where(p => p.Model == OSIModel.Transport.ToString()))
                 {
                     if (d is TcpDocument tcp)
-                        IndexTcp(bulkDescriptor, tcp);
+                        PacketIndexator.IndexTcp(bulkDescriptor, tcp);
                     else if (d is UdpDocument udp)
-                        IndexUdp(bulkDescriptor, udp);
+                        PacketIndexator.IndexUdp(bulkDescriptor, udp);
                 }
 
                 await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
@@ -434,29 +374,5 @@ namespace PacketDataIndexer
                 _packetsQueue.RemoveAll(p => p.Model == OSIModel.Transport.ToString());
             }
         }
-
-        /// <summary>
-        /// Индексация TCP.
-        /// </summary>
-        /// <param name="bulkDescriptor"></param>
-        /// <param name="tcp"></param>
-        private void IndexTcp(BulkDescriptor bulkDescriptor, TcpDocument tcp) =>
-            bulkDescriptor.Index<TcpDocument>(s => s
-                .Document(tcp)
-                .Id(tcp.Id)
-                .Index("tcp")
-            );
-
-        /// <summary>
-        /// Индексация UDP.
-        /// </summary>
-        /// <param name="bulkDescriptor"></param>
-        /// <param name="udp"></param>
-        private void IndexUdp(BulkDescriptor bulkDescriptor, UdpDocument udp) =>
-            bulkDescriptor.Index<UdpDocument>(s => s
-                .Document(udp)
-                .Id(udp.Id)
-                .Index("udp")
-            );
     }
 }
