@@ -13,10 +13,8 @@ namespace PacketDataIndexer.Services
         {
             var model = OSIModel.Transport.ToString();
 
-            if (packet is TcpPacket)
+            if (packet is TcpPacket tcp)
             {
-                TcpPacket tcp = (TcpPacket)packet;
-
                 return new TcpDocument
                 {
                     Id = (Guid)transportId!,
@@ -56,10 +54,8 @@ namespace PacketDataIndexer.Services
                     WindowSize = tcp.WindowSize,
                 };
             }
-            else if (packet is UdpPacket)
+            else if (packet is UdpPacket udp)
             {
-                UdpPacket udp = (UdpPacket)packet;
-
                 return new UdpDocument
                 {
                     Id = (Guid)transportId!,
@@ -85,14 +81,12 @@ namespace PacketDataIndexer.Services
             else return null;
         }
 
-        public static BasePacketDocument? GenerateInternetDocument(object packet, Guid? transportId, Guid? networkId, string agent)
+        public static BasePacketDocument? GenerateInternetDocument(object packet, Guid? networkId, Guid? transportId, string agent)
         {
             var model = OSIModel.Internet.ToString();
 
-            if (packet is IPv4Packet)
+            if (packet is IPv4Packet ipv4)
             {
-                IPv4Packet ipv4 = (IPv4Packet)packet;
-
                 return new IPv4Document
                 {
                     Id = (Guid)networkId!,
@@ -126,10 +120,8 @@ namespace PacketDataIndexer.Services
                     Version = ipv4.Version.ToString()
                 };
             }
-            else if (packet is IPv6Packet)
+            else if (packet is IPv6Packet ipv6)
             {
-                IPv6Packet ipv6 = (IPv6Packet)packet;
-
                 return new IPv6Document
                 {
                     Id = (Guid)networkId!,
@@ -160,10 +152,8 @@ namespace PacketDataIndexer.Services
                     Version = ipv6.Version.ToString()
                 };
             }
-            else if (packet is IcmpV4Packet)
+            else if (packet is IcmpV4Packet icmpv4)
             {
-                IcmpV4Packet icmpv4 = (IcmpV4Packet)packet;
-
                 return new IcmpV4Document
                 {
                     Id = (Guid)networkId!,
@@ -186,10 +176,8 @@ namespace PacketDataIndexer.Services
                     ValidIcmpChecksum = icmpv4.ValidIcmpChecksum
                 };
             }
-            else if (packet is IcmpV6Packet)
+            else if (packet is IcmpV6Packet icmpv6)
             {
-                IcmpV6Packet icmpv6 = (IcmpV6Packet)packet;
-
                 return new IcmpV6Document
                 {
                     Id = (Guid)networkId!,
@@ -210,10 +198,8 @@ namespace PacketDataIndexer.Services
                     Type = icmpv6.Type.ToString()
                 };
             }
-            else if (packet is IgmpV2Packet)
+            else if (packet is IgmpV2Packet igmp)
             {
-                IgmpV2Packet igmp = (IgmpV2Packet)packet;
-
                 return new IgmpV2Document
                 {
                     Id = (Guid)networkId!,

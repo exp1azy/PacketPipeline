@@ -260,9 +260,19 @@ namespace PacketDataIndexer
             Guid? internetId = internet == null ? null : Guid.NewGuid();
 
             if (internet != null)
-                await HandleInternetAsync(internet, (Guid)internetId!, transportId, agent, stoppingToken);
+                await HandleInternetAsync(
+                    internet: internet, 
+                    internetId: (Guid)internetId!, 
+                    transportId: transportId, 
+                    agent: agent, 
+                    stoppingToken: stoppingToken);
             if (transport != null)
-                await HandleTransportAsync(transport, (Guid)transportId!, internetId, agent, stoppingToken);
+                await HandleTransportAsync(
+                    transport: transport, 
+                    transportId: (Guid)transportId!, 
+                    internetId: internetId, 
+                    agent: agent, 
+                    stoppingToken: stoppingToken);
         }
 
         /// <summary>
