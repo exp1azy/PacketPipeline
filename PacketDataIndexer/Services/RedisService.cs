@@ -97,7 +97,7 @@ namespace PacketDataIndexer.Services
 
                     var rawPacketsToDelete = entries
                        .Where(e => e.Values.First().Name.StartsWith("raw_packets"))
-                       .Where(e => JsonConvert.DeserializeObject<RawPacket>(e.Values.First().Value.ToString())!.Timeval.Date + TimeSpan.FromHours(ttl) < DateTime.UtcNow)
+                       .Where(e => JsonConvert.DeserializeObject<RawPacket>(e.Values.First().Value.ToString())!.Timeval.Date + TimeSpan.FromMinutes(ttl) < DateTime.UtcNow)
                        .Select(e => e.Id)
                        .ToArray();
                     if (rawPacketsToDelete.Length != 0)
@@ -105,7 +105,7 @@ namespace PacketDataIndexer.Services
 
                     var statisticsToDelete = entries
                         .Where(e => e.Values.First().Name.StartsWith("statistics"))
-                        .Where(e => JsonConvert.DeserializeObject<Statistics>(e.Values.First().Value.ToString())!.Timeval.Date + TimeSpan.FromHours(ttl) < DateTime.UtcNow)
+                        .Where(e => JsonConvert.DeserializeObject<Statistics>(e.Values.First().Value.ToString())!.Timeval.Date + TimeSpan.FromMinutes(ttl) < DateTime.UtcNow)
                         .Select(e => e.Id)
                         .ToArray();
                     if (statisticsToDelete.Length != 0)
