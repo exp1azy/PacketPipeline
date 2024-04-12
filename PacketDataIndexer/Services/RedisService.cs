@@ -92,8 +92,7 @@ namespace PacketDataIndexer.Services
 
                 foreach (var agent in agents)
                 {
-                    var streamInfo = await _redisDatabase.StreamInfoAsync(agent);
-                    var entries = await _redisDatabase.StreamReadAsync(agent, streamInfo.FirstEntry.Id);
+                    var entries = await _redisDatabase.StreamReadAsync(agent, StreamPosition.Beginning);
 
                     var rawPacketsToDelete = entries
                        .Where(e => e.Values.First().Name.StartsWith("raw_packets"))
