@@ -3,8 +3,36 @@ using WebSpectre.Shared.ES;
 
 namespace PacketDataIndexer.Services
 {
-    public static class PacketIndexator
+    public static class Indexator
     {
+        /// <summary>
+        /// Индексация метрик сети.
+        /// </summary>
+        /// <param name="bulkDescriptor"></param>
+        /// <param name="pcapStat"></param>
+        public static void IndexPcapMetrics(BulkDescriptor bulkDescriptor, PcapMetricsDocument pcapStat)
+        {
+            bulkDescriptor.Index<PcapMetricsDocument>(s => s
+                .Document(pcapStat)
+                .Id(pcapStat.Id)
+                .Index("pcap_metrics")
+            );
+        }
+
+        /// <summary>
+        /// Индексация статистики.
+        /// </summary>
+        /// <param name="bulkDescriptor"></param>
+        /// <param name="statistics"></param>
+        public static void IndexStatistics(BulkDescriptor bulkDescriptor, StatisticsDocument statistics)
+        {
+            bulkDescriptor.Index<StatisticsDocument>(s => s
+                .Document(statistics)
+                .Id(statistics.Id)
+                .Index("statistics")
+            );
+        }
+
         /// <summary>
         /// Индексация TCP.
         /// </summary>

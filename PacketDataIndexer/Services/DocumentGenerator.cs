@@ -1,15 +1,23 @@
 ﻿using PacketDotNet;
 using WebSpectre.Shared;
 using WebSpectre.Shared.ES;
+using WebSpectre.Shared.Perfomance;
 
 namespace PacketDataIndexer.Services
 {
-    /// <summary>
-    /// Предоставляет логику обработки пакетов сетевого уровня модели OSI.
-    /// </summary>
     public static class DocumentGenerator
     {
-        public static BasePacketDocument? GenerateTransportDocument(object packet, Guid? transportId, Guid? networkId, string agent)
+        public static PcapMetricsDocument GeneratePcapMetricsDocument(CurrentMetrics currentStat, string agent)
+        {
+            return new PcapMetricsDocument
+            {
+                Id = Guid.NewGuid(),
+                Agent = agent,
+                CurrentStat = currentStat
+            };
+        }
+
+        public static BasePacketDocument? GenerateTransportDocument(object packet, string agent)
         {
             var model = OSIModel.Transport.ToString();
 
@@ -17,8 +25,7 @@ namespace PacketDataIndexer.Services
             {
                 return new TcpDocument
                 {
-                    Id = (Guid)transportId!,
-                    Nested = networkId,
+                    Id = Guid.NewGuid(),
                     Agent = agent,
                     Model = model,
                     Acknowledgment = tcp.Acknowledgment,
@@ -58,8 +65,7 @@ namespace PacketDataIndexer.Services
             {
                 return new UdpDocument
                 {
-                    Id = (Guid)transportId!,
-                    Nested = networkId,
+                    Id = Guid.NewGuid(),
                     Agent = agent,
                     Model = model,
                     Bytes = udp.Bytes,
@@ -81,7 +87,7 @@ namespace PacketDataIndexer.Services
             else return null;
         }
 
-        public static BasePacketDocument? GenerateInternetDocument(object packet, Guid? networkId, Guid? transportId, string agent)
+        public static BasePacketDocument? GenerateInternetDocument(object packet, string agent)
         {
             var model = OSIModel.Internet.ToString();
 
@@ -89,8 +95,7 @@ namespace PacketDataIndexer.Services
             {
                 return new IPv4Document
                 {
-                    Id = (Guid)networkId!,
-                    Nested = transportId,
+                    Id = Guid.NewGuid(),
                     Agent = agent,
                     Model = model,
                     Bytes = ipv4.Bytes,
@@ -124,8 +129,7 @@ namespace PacketDataIndexer.Services
             {
                 return new IPv6Document
                 {
-                    Id = (Guid)networkId!,
-                    Nested = transportId,
+                    Id = Guid.NewGuid(),
                     Agent = agent,
                     Model = model,
                     Bytes = ipv6.Bytes,
@@ -156,8 +160,7 @@ namespace PacketDataIndexer.Services
             {
                 return new IcmpV4Document
                 {
-                    Id = (Guid)networkId!,
-                    Nested = transportId,
+                    Id = Guid.NewGuid(),
                     Agent = agent,
                     Model = model,
                     Bytes = icmpv4.Bytes,
@@ -180,8 +183,7 @@ namespace PacketDataIndexer.Services
             {
                 return new IcmpV6Document
                 {
-                    Id = (Guid)networkId!,
-                    Nested = transportId,
+                    Id = Guid.NewGuid(),
                     Agent = agent,
                     Model = model,
                     Bytes = icmpv6.Bytes,
@@ -202,8 +204,7 @@ namespace PacketDataIndexer.Services
             {
                 return new IgmpV2Document
                 {
-                    Id = (Guid)networkId!,
-                    Nested = transportId,
+                    Id = Guid.NewGuid(),
                     Agent = agent,
                     Model = model,
                     Bytes = igmp.Bytes,

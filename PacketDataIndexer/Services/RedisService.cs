@@ -95,20 +95,24 @@ namespace PacketDataIndexer.Services
                     var entries = await _redisDatabase.StreamReadAsync(agent, StreamPosition.Beginning);
 
                     var rawPacketsToDelete = entries
-                       .Where(e => e.Values.First().Name.StartsWith("raw_packets"))
-                       .Where(e => JsonConvert.DeserializeObject<RawPacket>(e.Values.First().Value.ToString())!.Timeval.Date + TimeSpan.FromMinutes(ttl) < DateTime.UtcNow)
-                       .Select(e => e.Id)
-                       .ToArray();
+                        .Where(entry => entry.Values.Any(value => value.Name.StartsWith("raw_packets")))
+                        .Where(entry => entry.Values.All(value => 
+                            JsonConvert.DeserializeObject<RawPacket>(value.Value.ToString())!.Timeval.Date + TimeSpan.FromMinutes(ttl) < DateTime.UtcNow))
+                        .Select(entry => entry.Id)
+                        .ToArray();
+
                     if (rawPacketsToDelete.Length != 0)
-                        _ = _redisDatabase.StreamDeleteAsync(agent, rawPacketsToDelete);
+                        await _redisDatabase.StreamDeleteAsync(agent, rawPacketsToDelete);
 
                     var statisticsToDelete = entries
-                        .Where(e => e.Values.First().Name.StartsWith("statistics"))
-                        .Where(e => JsonConvert.DeserializeObject<Statistics>(e.Values.First().Value.ToString())!.Timeval.Date + TimeSpan.FromMinutes(ttl) < DateTime.UtcNow)
-                        .Select(e => e.Id)
+                        .Where(entry => entry.Values.Any(value => value.Name.StartsWith("statistics")))
+                        .Where(entry => entry.Values.All(value =>
+                            JsonConvert.DeserializeObject<Statistics>(value.Value.ToString())!.Timeval.Date + TimeSpan.FromMinutes(ttl) < DateTime.UtcNow))
+                        .Select(entry => entry.Id)
                         .ToArray();
+
                     if (statisticsToDelete.Length != 0)
-                        _ = _redisDatabase.StreamDeleteAsync(agent, statisticsToDelete);
+                        await _redisDatabase.StreamDeleteAsync(agent, statisticsToDelete);
                 }
             }
         }
