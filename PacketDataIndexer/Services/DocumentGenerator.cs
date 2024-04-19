@@ -5,8 +5,17 @@ using WebSpectre.Shared.Perfomance;
 
 namespace PacketDataIndexer.Services
 {
+    /// <summary>
+    /// Класс формирования документов для Elasticsearch.
+    /// </summary>
     public static class DocumentGenerator
     {
+        /// <summary>
+        /// Формирование документа с сетевыми метриками.
+        /// </summary>
+        /// <param name="currentStat">Экземпляр метрик <see cref="CurrentMetrics"/>.</param>
+        /// <param name="agent">Агент.</param>
+        /// <returns>Документ <see cref="PcapMetricsDocument"/>.</returns>
         public static PcapMetricsDocument GeneratePcapMetricsDocument(CurrentMetrics currentStat, string agent)
         {
             return new PcapMetricsDocument
@@ -16,6 +25,19 @@ namespace PacketDataIndexer.Services
                 CurrentStat = currentStat
             };
         }
+
+        /// <summary>
+        /// Формирование документа со статистикой.
+        /// </summary>
+        /// <param name="statistics">Экземпляр статистики <see cref="Statistics"/>.</param>
+        /// <param name="agent">Агент.</param>
+        /// <returns>Документ <see cref="StatisticsDocument"/>.</returns>
+        public static StatisticsDocument GenerateStatisticsDocument(Statistics statistics, string agent) => new StatisticsDocument
+        {
+            Id = Guid.NewGuid(),
+            Agent = agent,
+            Statistics = statistics
+        };
 
         public static BasePacketDocument? GenerateTransportDocument(object packet, string agent)
         {

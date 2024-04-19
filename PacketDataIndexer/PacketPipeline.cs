@@ -325,7 +325,7 @@ namespace PacketDataIndexer
         /// <returns></returns>
         private async Task GenerateAndIndexStatisticsAsync(Statistics statistics, RedisKey agent, CancellationToken stoppingToken)
         {
-            var document = StatisticsGenerator.GenerateStatisticsDocument(statistics, agent.ToString());
+            var document = DocumentGenerator.GenerateStatisticsDocument(statistics, agent.ToString());
 
             if (_statisticsList.Count < _maxListSize)
             {
