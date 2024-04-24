@@ -39,7 +39,7 @@ namespace PacketDataIndexer.Services
             Statistics = statistics
         };
 
-        public static BasePacketDocument? GenerateTransportDocument(object packet, string agent)
+        public static BasePacketDocument? GenerateTransportDocument(Timeval timeval, object packet, string agent)
         {
             var model = OSIModel.Transport.ToString();
 
@@ -49,6 +49,7 @@ namespace PacketDataIndexer.Services
                 {
                     Id = Guid.NewGuid(),
                     Agent = agent,
+                    DateTime = timeval.Date.ToLocalTime(),
                     Model = model,
                     Acknowledgment = tcp.Acknowledgment,
                     AcknowledgmentNumber = tcp.AcknowledgmentNumber,
@@ -89,6 +90,7 @@ namespace PacketDataIndexer.Services
                 {
                     Id = Guid.NewGuid(),
                     Agent = agent,
+                    DateTime = timeval.Date.ToLocalTime(),
                     Model = model,
                     Bytes = udp.Bytes,
                     Checksum = udp.Checksum,
@@ -109,7 +111,7 @@ namespace PacketDataIndexer.Services
             else return null;
         }
 
-        public static BasePacketDocument? GenerateInternetDocument(object packet, string agent)
+        public static BasePacketDocument? GenerateInternetDocument(Timeval timeval, object packet, string agent)
         {
             var model = OSIModel.Internet.ToString();
 
@@ -119,6 +121,7 @@ namespace PacketDataIndexer.Services
                 {
                     Id = Guid.NewGuid(),
                     Agent = agent,
+                    DateTime = timeval.Date.ToLocalTime(),
                     Model = model,
                     Bytes = ipv4.Bytes,
                     HasPayloadData = ipv4.HasPayloadData,
@@ -153,6 +156,7 @@ namespace PacketDataIndexer.Services
                 {
                     Id = Guid.NewGuid(),
                     Agent = agent,
+                    DateTime = timeval.Date.ToLocalTime(),
                     Model = model,
                     Bytes = ipv6.Bytes,
                     HasPayloadData = ipv6.HasPayloadData,
@@ -184,6 +188,7 @@ namespace PacketDataIndexer.Services
                 {
                     Id = Guid.NewGuid(),
                     Agent = agent,
+                    DateTime = timeval.Date.ToLocalTime(),
                     Model = model,
                     Bytes = icmpv4.Bytes,
                     HasPayloadData = icmpv4.HasPayloadData,
@@ -207,6 +212,7 @@ namespace PacketDataIndexer.Services
                 {
                     Id = Guid.NewGuid(),
                     Agent = agent,
+                    DateTime = timeval.Date.ToLocalTime(),
                     Model = model,
                     Bytes = icmpv6.Bytes,
                     HasPayloadData = icmpv6.HasPayloadData,
@@ -228,6 +234,7 @@ namespace PacketDataIndexer.Services
                 {
                     Id = Guid.NewGuid(),
                     Agent = agent,
+                    DateTime = timeval.Date.ToLocalTime(),
                     Model = model,
                     Bytes = igmp.Bytes,
                     Checksum = igmp.Checksum,

@@ -225,7 +225,7 @@ namespace PacketDataIndexer
                             foreach (var rp in rawPackets)
                             {
                                 var packet = Packet.ParsePacket((LinkLayers)rp!.LinkLayerType, rp.Data);
-                                await GenerateAndIndexNetworkAsync(packet, agent, stoppingToken);
+                                await ExtractAndHandlePacketAsync(rp.Timeval, packet, agent, stoppingToken);
                             }
 
                             var statistics = Deserializer.GetDeserializedStatistics(entries);
@@ -297,13 +297,13 @@ namespace PacketDataIndexer
         }
 
         /// <summary>
-        /// Метод, необходимый для индексации пакетов.
+        /// Метод, необходимый для извлечения и обработки пакетов.
         /// </summary>
         /// <param name="packet">Пакет.</param>
         /// <param name="agent">Агент.</param>
         /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
-        private async Task GenerateAndIndexNetworkAsync(Packet packet, RedisKey agent, CancellationToken stoppingToken)
+        private async Task ExtractAndHandlePacketAsync(Timeval timeval, Packet packet, RedisKey agent, CancellationToken stoppingToken)
         {
             var internet = PacketExtractor.ExtractInternet(packet);
 
@@ -311,6 +311,7 @@ namespace PacketDataIndexer
                 return;
 
             await HandleInternetAsync(
+                timeval: timeval,
                 internet: internet,
                 agent: agent, 
                 stoppingToken: stoppingToken);
@@ -349,13 +350,12 @@ namespace PacketDataIndexer
         /// <summary>
         /// Фомирование и индексация документа с пакетом сетевого уровня.
         /// </summary>
-        /// <param name="internetId">Идентификатор пакета сетевого уровня.</param>
         /// <param name="agent">Агент.</param>
         /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
-        private async Task HandleInternetAsync(object internet, RedisKey agent, CancellationToken stoppingToken)
+        private async Task HandleInternetAsync(Timeval timeval, object internet, RedisKey agent, CancellationToken stoppingToken)
         {
-            var document = DocumentGenerator.GenerateInternetDocument(internet, agent.ToString());
+            var document = DocumentGenerator.GenerateInternetDocument(timeval, internet, agent.ToString());
             if (document == null) return;
 
             if (_packetsList.Count < _maxListSize)
