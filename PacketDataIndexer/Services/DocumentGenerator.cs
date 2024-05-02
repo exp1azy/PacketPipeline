@@ -16,27 +16,24 @@ namespace PacketDataIndexer.Services
         /// <param name="currentStat">Экземпляр метрик <see cref="CurrentMetrics"/>.</param>
         /// <param name="agent">Агент.</param>
         /// <returns>Документ <see cref="PcapMetricsDocument"/>.</returns>
-        public static PcapMetricsDocument GeneratePcapMetricsDocument(CurrentMetrics currentStat, string agent)
+        public static PcapMetricsDocument GeneratePcapMetricsDocument(CurrentMetrics currentStat, string agent) => new()
         {
-            return new PcapMetricsDocument
-            {
-                Id = Guid.NewGuid(),
-                Agent = agent,
-                CurrentStat = currentStat
-            };
-        }
-
+            Id = Guid.NewGuid(),
+            Agent = agent,
+            CurrentStat = currentStat
+        };
+        
         /// <summary>
         /// Формирование документа со статистикой.
         /// </summary>
         /// <param name="statistics">Экземпляр статистики <see cref="Statistics"/>.</param>
         /// <param name="agent">Агент.</param>
         /// <returns>Документ <see cref="StatisticsDocument"/>.</returns>
-        public static StatisticsDocument GenerateStatisticsDocument(Statistics statistics, string agent) => new StatisticsDocument
+        public static StatisticsDocument GenerateStatisticsDocument(Statistics statistics, string agent) => new()
         {
             Id = Guid.NewGuid(),
             Agent = agent,
-            Statistics = statistics
+            Statistics = statistics        
         };
 
         public static BasePacketDocument? GenerateTransportDocument(Timeval timeval, object packet, string agent)
