@@ -240,7 +240,7 @@ namespace PacketDataIndexer
                         catch (Exception ex)
                         {
                             _logger.LogError(Error.Unexpected, ex.Message);
-                            Environment.Exit(1);
+                            await Task.Delay(TimeSpan.FromSeconds(20));
                         }
                     }
                 }, stoppingToken));
