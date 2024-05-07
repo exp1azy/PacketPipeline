@@ -120,9 +120,6 @@
   <data name="FailedToReadElasticConnectionString" xml:space="preserve">
     <value>Не удалось прочитать ESConnectionString из файла конфигурации appsettings.json</value>
   </data>
-  <data name="FailedToReadESAuthParams" xml:space="preserve">
-    <value>Не удалось прочитать ESAuthParams из файла конфигурации appsettings.json</value>
-  </data>
   <data name="FailedToReadRedisConnectionString" xml:space="preserve">
     <value>Не удалось прочитать RedisConnectionString из файла конфигурации appsettings.json</value>
   </data>

@@ -29,18 +29,22 @@ namespace PacketDataIndexer.Services
         /// <param name="username">Имя пользователя.</param>
         /// <param name="password">Пароль.</param>
         /// <returns></returns>
-        public async Task ConnectAsync(string connectionString, string username, string password, int delay = 10)
+        public async Task ConnectAsync(string connectionString, string? username, string? password, int delay = 10)
         {
             while (true)
             {
                 try
                 {
                     var settings = new ConnectionSettings(new Uri(connectionString))
-                        .BasicAuthentication(username, password)
                         .ServerCertificateValidationCallback((o, certificate, chain, errors) => true)
                         .ServerCertificateValidationCallback(CertificateValidations.AllowAll)
                         .DisableDirectStreaming();
+
+                    if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))                   
+                        settings = settings.BasicAuthentication(username, password);                   
+
                     _elasticClient = new ElasticClient(settings);
+
                     break;
                 }
                 catch

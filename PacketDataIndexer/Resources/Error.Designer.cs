@@ -70,15 +70,6 @@ namespace PacketDataIndexer.Resources {
         }
         
         /// <summary>
-        ///   Ищет локализованную строку, похожую на Не удалось прочитать ESAuthParams из файла конфигурации appsettings.json.
-        /// </summary>
-        internal static string FailedToReadESAuthParams {
-            get {
-                return ResourceManager.GetString("FailedToReadESAuthParams", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Ищет локализованную строку, похожую на Не удалось прочитать RedisConnectionString из файла конфигурации appsettings.json.
         /// </summary>
         internal static string FailedToReadRedisConnectionString {

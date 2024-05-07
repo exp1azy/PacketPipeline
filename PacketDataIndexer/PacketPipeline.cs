@@ -94,11 +94,6 @@ namespace PacketDataIndexer
             }
 
             var authParams = _config.GetSection("ElasticSearchAuth");
-            if (string.IsNullOrEmpty(authParams["Username"]) || string.IsNullOrEmpty(authParams["Password"]))
-            {
-                _logger.LogError(Error.FailedToReadESAuthParams);
-                Environment.Exit(1);
-            }
             _elasticUsername = authParams["Username"];
             _elasticPassword = authParams["Password"];
 
@@ -160,7 +155,7 @@ namespace PacketDataIndexer
                 await _redisService.ConnectAsync(_redisConnectionString!, _redisConnectionDelay));
 
             _elasticTask = Task.Run(async () =>
-                await _elasticSearchService.ConnectAsync(_elasticConnectionString!, _elasticUsername!, _elasticPassword!, _elasticConnectionDelay));
+                await _elasticSearchService.ConnectAsync(_elasticConnectionString!, _elasticUsername, _elasticPassword, _elasticConnectionDelay));
         }
 
         /// <summary>
