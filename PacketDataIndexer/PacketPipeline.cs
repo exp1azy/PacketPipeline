@@ -195,53 +195,59 @@ namespace PacketDataIndexer
             {
                 tasks.Add(Task.Run(async () =>
                 {
-                    var offset = StreamPosition.Beginning;
-                    while (!stoppingToken.IsCancellationRequested)
+                var offset = StreamPosition.Beginning;
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    try
                     {
-                        try
+                        var entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
+                        while (entries.Length == 0)
                         {
-                            var entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
-                            while (entries.Length == 0)
-                            {
-                                _logger.LogWarning(Warning.StreamIsEmpty, agent);
-                                await Task.Delay(TimeSpan.FromSeconds(_streamReadDelay), stoppingToken);
-                                entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
-                            }
+                            _logger.LogWarning(Warning.StreamIsEmpty, agent);
+                            await Task.Delay(TimeSpan.FromSeconds(_streamReadDelay), stoppingToken);
+                            entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
+                        }
 
-                            var rawPackets = Deserializer.GetDeserializedRawPackets(entries);
-                            if (rawPackets.Count == 0)
-                            {
-                                await Task.Delay(TimeSpan.FromSeconds(_streamReadDelay), stoppingToken);
-                                continue;
-                            }
-                                
-                            var metricsCalcTask = Task.Run(() => CalculateAndIndexMetricsAsync(rawPackets, agent.ToString(), stoppingToken), stoppingToken);
+                        var rawPackets = Deserializer.GetDeserializedRawPackets(entries);
+                        if (rawPackets.Count == 0)
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(_streamReadDelay), stoppingToken);
+                            continue;
+                        }
 
+                        var statistics = Deserializer.GetDeserializedStatistics(entries);
+
+                        var rpTask = Task.Run(async () =>
+                        {
                             foreach (var rp in rawPackets)
                             {
                                 var packet = Packet.ParsePacket((LinkLayers)rp!.LinkLayerType, rp.Data);
-                                await ExtractAndHandlePacketAsync(rp.Timeval, packet, agent, stoppingToken);
+                                await CalculateAndIndexMetricsAsync(rp.Timeval, packet, agent.ToString(), stoppingToken);
+                                await ExtractAndHandlePacketAsync(rp.Timeval, packet, agent.ToString(), stoppingToken);
                             }
+                        });
 
-                            var statistics = Deserializer.GetDeserializedStatistics(entries);
+                        var statTask = Task.Run(async () =>
+                        {
                             foreach (var s in statistics)
                             {
                                 await GenerateAndIndexStatisticsAsync(s!, agent, stoppingToken);
                             }
+                        });
 
-                            await metricsCalcTask;
+                        await Task.WhenAll(rpTask, statTask);
 
-                            offset = entries.Last().Id;
-                        }
-                        catch (RedisConnectionException)
-                        {
-                            await _redisService.ConnectAsync(_config.GetConnectionString("RedisConnection")!);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(Error.Unexpected, ex.Message);
-                            Environment.Exit(1);
-                        }
+                        offset = entries.Last().Id;
+                    }
+                    catch (RedisConnectionException)
+                    {
+                        await _redisService.ConnectAsync(_config.GetConnectionString("RedisConnection")!);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(Error.Unexpected, ex.Message);
+                        Environment.Exit(1);
+                    }
                     }
                 }, stoppingToken));
             }
@@ -255,38 +261,33 @@ namespace PacketDataIndexer
         /// <summary>
         /// Метод, необходимый для вычисления и индексации метрик сети.
         /// </summary>
-        /// <param name="rawPackets">Необработанные пакеты.</param>
         /// <param name="agent">Агент.</param>
         /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
-        private async Task CalculateAndIndexMetricsAsync(List<RawPacket> rawPackets, string agent, CancellationToken stoppingToken)
+        private async Task CalculateAndIndexMetricsAsync(Timeval timeval, Packet packet, string agent, CancellationToken stoppingToken)
         {
-            foreach (var rawPacket in rawPackets)
-            {
-                var packet = Packet.ParsePacket((LinkLayers)rawPacket!.LinkLayerType, rawPacket.Data);
-                var currentMetrics = _perfomanceCalculator.GetCurrentMetrics(packet, rawPacket.Timeval);
+            var currentMetrics = _perfomanceCalculator.GetCurrentMetrics(packet, timeval);
                 
-                if (currentMetrics != null)
+            if (currentMetrics != null)
+            {
+                var document = DocumentGenerator.GeneratePcapMetricsDocument(currentMetrics, agent);
+
+                if (_pcapStatList.Count < _maxListSize)
                 {
-                    var document = DocumentGenerator.GeneratePcapMetricsDocument(currentMetrics, agent);
+                    _pcapStatList.Add(document);
+                }
+                else
+                {
+                    var bulkDescriptor = new BulkDescriptor("pcap_metrics");
 
-                    if (_pcapStatList.Count < _maxListSize)
+                    foreach (var pcapStat in _pcapStatList)
                     {
-                        _pcapStatList.Add(document);
+                        Indexator.IndexPcapMetrics(bulkDescriptor, pcapStat);
                     }
-                    else
-                    {
-                        var bulkDescriptor = new BulkDescriptor("pcap_metrics");
 
-                        foreach (var pcapStat in _pcapStatList)
-                        {
-                            Indexator.IndexPcapMetrics(bulkDescriptor, pcapStat);
-                        }
+                    await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
 
-                        await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
-
-                        _pcapStatList.Clear();
-                    }
+                    _pcapStatList.Clear();
                 }
             }
         }
@@ -298,7 +299,7 @@ namespace PacketDataIndexer
         /// <param name="agent">Агент.</param>
         /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
-        private async Task ExtractAndHandlePacketAsync(Timeval timeval, Packet packet, RedisKey agent, CancellationToken stoppingToken)
+        private async Task ExtractAndHandlePacketAsync(Timeval timeval, Packet packet, string agent, CancellationToken stoppingToken)
         {
             var internet = PacketExtractor.ExtractInternet(packet);
 
