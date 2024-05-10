@@ -195,59 +195,59 @@ namespace PacketDataIndexer
             {
                 tasks.Add(Task.Run(async () =>
                 {
-                var offset = StreamPosition.Beginning;
-                while (!stoppingToken.IsCancellationRequested)
-                {
-                    try
+                    var offset = StreamPosition.Beginning;
+                    while (!stoppingToken.IsCancellationRequested)
                     {
-                        var entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
-                        while (entries.Length == 0)
+                        try
                         {
-                            _logger.LogWarning(Warning.StreamIsEmpty, agent);
-                            await Task.Delay(TimeSpan.FromSeconds(_streamReadDelay), stoppingToken);
-                            entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
-                        }
-
-                        var rawPackets = Deserializer.GetDeserializedRawPackets(entries);
-                        if (rawPackets.Count == 0)
-                        {
-                            await Task.Delay(TimeSpan.FromSeconds(_streamReadDelay), stoppingToken);
-                            continue;
-                        }
-
-                        var statistics = Deserializer.GetDeserializedStatistics(entries);
-
-                        var rpTask = Task.Run(async () =>
-                        {
-                            foreach (var rp in rawPackets)
+                            var entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
+                            while (entries.Length == 0)
                             {
-                                var packet = Packet.ParsePacket((LinkLayers)rp!.LinkLayerType, rp.Data);
-                                await CalculateAndIndexMetricsAsync(rp.Timeval, packet, agent.ToString(), stoppingToken);
-                                await ExtractAndHandlePacketAsync(rp.Timeval, packet, agent.ToString(), stoppingToken);
+                                _logger.LogWarning(Warning.StreamIsEmpty, agent);
+                                await Task.Delay(TimeSpan.FromSeconds(_streamReadDelay), stoppingToken);
+                                entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
                             }
-                        });
 
-                        var statTask = Task.Run(async () =>
-                        {
-                            foreach (var s in statistics)
+                            var rawPackets = Deserializer.GetDeserializedRawPackets(entries);
+                            if (rawPackets.Count == 0)
                             {
-                                await GenerateAndIndexStatisticsAsync(s!, agent, stoppingToken);
+                                await Task.Delay(TimeSpan.FromSeconds(_streamReadDelay), stoppingToken);
+                                continue;
                             }
-                        });
 
-                        await Task.WhenAll(rpTask, statTask);
+                            var statistics = Deserializer.GetDeserializedStatistics(entries);
 
-                        offset = entries.Last().Id;
-                    }
-                    catch (RedisConnectionException)
-                    {
-                        await _redisService.ConnectAsync(_config.GetConnectionString("RedisConnection")!);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(Error.Unexpected, ex.Message);
-                        Environment.Exit(1);
-                    }
+                            var rpTask = Task.Run(async () =>
+                            {
+                                foreach (var rp in rawPackets)
+                                {
+                                    var packet = Packet.ParsePacket((LinkLayers)rp!.LinkLayerType, rp.Data);
+                                    await CalculateAndIndexMetricsAsync(rp.Timeval, packet, agent.ToString(), stoppingToken);
+                                    await ExtractAndHandlePacketAsync(rp.Timeval, packet, agent.ToString(), stoppingToken);
+                                }
+                            });
+
+                            var statTask = Task.Run(async () =>
+                            {
+                                foreach (var s in statistics)
+                                {
+                                    await GenerateAndIndexStatisticsAsync(s!, agent, stoppingToken);
+                                }
+                            });
+
+                            await Task.WhenAll(rpTask, statTask);
+
+                            offset = entries.Last().Id;
+                        }
+                        catch (RedisConnectionException)
+                        {
+                            await _redisService.ConnectAsync(_config.GetConnectionString("RedisConnection")!);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(Error.Unexpected, ex.Message);
+                            await Task.Delay(TimeSpan.FromSeconds(20));
+                        }
                     }
                 }, stoppingToken));
             }
@@ -352,7 +352,8 @@ namespace PacketDataIndexer
         private async Task HandleInternetAsync(Timeval timeval, object internet, RedisKey agent, CancellationToken stoppingToken)
         {
             var document = DocumentGenerator.GenerateInternetDocument(timeval, internet, agent.ToString());
-            if (document == null) return;
+            if (document == null) 
+                return;
 
             if (_packetsList.Count < _maxListSize)
             {
@@ -362,7 +363,7 @@ namespace PacketDataIndexer
             {
                 var bulkDescriptor = new BulkDescriptor();
 
-                foreach (var packet in _packetsList.Where(p => p.Model == OSIModel.Internet.ToString()))
+                foreach (var packet in _packetsList)
                 {
                     if (packet is IPv4Document ipv4)                   
                         Indexator.IndexIPv4(bulkDescriptor, ipv4);
@@ -370,7 +371,7 @@ namespace PacketDataIndexer
 
                 await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
 
-                _packetsList.RemoveAll(p => p.Model == OSIModel.Internet.ToString());
+                _packetsList.Clear();
             }
         }
     }
