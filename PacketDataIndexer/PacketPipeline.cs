@@ -266,7 +266,7 @@ namespace PacketDataIndexer
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(Error.Unexpected, ex.Message);
+                            _logger.LogError(Error.Unexpected, ex);
                             await Task.Delay(TimeSpan.FromSeconds(20));
                         }
                     }
