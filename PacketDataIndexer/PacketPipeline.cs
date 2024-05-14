@@ -1,11 +1,11 @@
 ﻿using Nest;
+using PacketDataIndexer.Models;
 using PacketDataIndexer.Resources;
 using PacketDataIndexer.Services;
 using PacketDotNet;
 using StackExchange.Redis;
 using WebSpectre.Shared;
 using WebSpectre.Shared.ES;
-using WebSpectre.Shared.Perfomance;
 using WebSpectre.Shared.Services;
 using Error = PacketDataIndexer.Resources.Error;
 
@@ -27,9 +27,9 @@ namespace PacketDataIndexer
         private Task? _elasticTask;
         private Task? _clearingTask;
 
-        private List<BasePacketDocument> _packetsList;
-        private List<StatisticsDocument> _statisticsList;
-        private List<PcapMetricsDocument> _pcapStatList;
+        private List<AgentPackets> _packets;
+        private List<AgentStatistics> _statistics;
+        private List<AgentMetrics> _metrics;
 
         private int _maxListSize;
         private int _streamClearTimeout;
@@ -59,9 +59,9 @@ namespace PacketDataIndexer
             _elasticSearchService = new ElasticSearchService(_logger);
             _perfomanceCalculator = new PerfomanceCalculator();
 
-            _packetsList = new List<BasePacketDocument>(_maxListSize);
-            _statisticsList = new List<StatisticsDocument>(_maxListSize);
-            _pcapStatList = new List<PcapMetricsDocument>(_maxListSize);
+            _packets = new List<AgentPackets>(_maxListSize);
+            _statistics = new List<AgentStatistics>(_maxListSize);
+            _metrics = new List<AgentMetrics>(_maxListSize);
         }
 
         /// <summary>
@@ -187,6 +187,25 @@ namespace PacketDataIndexer
                 }
             }
 
+            foreach (var agent in agents)
+            {
+                _packets.Add(new AgentPackets
+                {
+                    Agent = agent.ToString(),
+                    Packets = []
+                });
+                _statistics.Add(new AgentStatistics
+                {
+                    Agent = agent.ToString(),
+                    Statistics = []
+                });
+                _metrics.Add(new AgentMetrics
+                {
+                    Agent = agent.ToString(),
+                    Metrics = []
+                });
+            }
+
             _clearingTask = Task.Run(async () => await _redisService.ClearRedisStreamAsync(_streamClearTimeout, _streamTTL, agents, stoppingToken), stoppingToken);
 
             var tasks = new List<Task>();
@@ -208,6 +227,8 @@ namespace PacketDataIndexer
                                 entries = await _redisService.ReadStreamAsync(agent, offset, _streamCount);
                             }
 
+                            var stringAgent = agent.ToString();
+
                             var rawPackets = Deserializer.GetDeserializedRawPackets(entries);
                             if (rawPackets.Count == 0)
                             {
@@ -222,8 +243,8 @@ namespace PacketDataIndexer
                                 foreach (var rp in rawPackets)
                                 {
                                     var packet = Packet.ParsePacket((LinkLayers)rp!.LinkLayerType, rp.Data);
-                                    await CalculateAndIndexMetricsAsync(rp.Timeval, packet, agent.ToString(), stoppingToken);
-                                    await ExtractAndHandlePacketAsync(rp.Timeval, packet, agent.ToString(), stoppingToken);
+                                    await CalculateAndIndexMetricsAsync(rp.Timeval, packet, stringAgent, stoppingToken);
+                                    await ExtractAndHandlePacketAsync(rp.Timeval, packet, stringAgent, stoppingToken);
                                 }
                             });
 
@@ -231,7 +252,7 @@ namespace PacketDataIndexer
                             {
                                 foreach (var s in statistics)
                                 {
-                                    await GenerateAndIndexStatisticsAsync(s!, agent, stoppingToken);
+                                    await GenerateAndIndexStatisticsAsync(s!, stringAgent, stoppingToken);
                                 }
                             });
 
@@ -272,22 +293,23 @@ namespace PacketDataIndexer
             {
                 var document = DocumentGenerator.GeneratePcapMetricsDocument(currentMetrics, agent);
 
-                if (_pcapStatList.Count < _maxListSize)
+                var currentAgentMetrics = _metrics.First(m => m.Agent == agent);
+                if (currentAgentMetrics.Metrics.Count < _maxListSize)
                 {
-                    _pcapStatList.Add(document);
+                    currentAgentMetrics.Metrics.Add(document);
                 }
                 else
                 {
                     var bulkDescriptor = new BulkDescriptor("pcap_metrics");
 
-                    foreach (var pcapStat in _pcapStatList)
+                    foreach (var metrics in currentAgentMetrics.Metrics)
                     {
-                        Indexator.IndexPcapMetrics(bulkDescriptor, pcapStat);
+                        Indexator.IndexPcapMetrics(bulkDescriptor, metrics);
                     }
 
                     await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
 
-                    _pcapStatList.Clear();
+                    currentAgentMetrics.Metrics.Clear();
                 }
             }
         }
@@ -320,26 +342,27 @@ namespace PacketDataIndexer
         /// <param name="agent">Агент.</param>
         /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
-        private async Task GenerateAndIndexStatisticsAsync(Statistics statistics, RedisKey agent, CancellationToken stoppingToken)
+        private async Task GenerateAndIndexStatisticsAsync(Statistics statistics, string agent, CancellationToken stoppingToken)
         {
             var document = DocumentGenerator.GenerateStatisticsDocument(statistics, agent.ToString());
 
-            if (_statisticsList.Count < _maxListSize)
+            var currentAgentStats = _statistics.First(s => s.Agent == agent);
+            if (currentAgentStats.Statistics.Count < _maxListSize)
             {
-                _statisticsList.Add(document);
+                currentAgentStats.Statistics.Add(document);
             }
             else
             {
                 var bulkDescriptor = new BulkDescriptor("statistics");
 
-                foreach (var stat in _statisticsList)
+                foreach (var stat in currentAgentStats.Statistics)
                 {
                     Indexator.IndexStatistics(bulkDescriptor, stat);
                 }
 
                 await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
 
-                _statisticsList.Clear();
+                currentAgentStats.Statistics.Clear();
             }
         }
 
@@ -349,21 +372,22 @@ namespace PacketDataIndexer
         /// <param name="agent">Агент.</param>
         /// <param name="stoppingToken">Токен остановки.</param>
         /// <returns></returns>
-        private async Task HandleInternetAsync(Timeval timeval, object internet, RedisKey agent, CancellationToken stoppingToken)
+        private async Task HandleInternetAsync(Timeval timeval, object internet, string agent, CancellationToken stoppingToken)
         {
             var document = DocumentGenerator.GenerateInternetDocument(timeval, internet, agent.ToString());
             if (document == null) 
                 return;
 
-            if (_packetsList.Count < _maxListSize)
+            var currentAgentPackets = _packets.First(p => p.Agent == agent);
+            if (currentAgentPackets.Packets.Count < _maxListSize)
             {
-                _packetsList.Add(document);
+                currentAgentPackets.Packets.Add(document);
             }
             else
             {
                 var bulkDescriptor = new BulkDescriptor();
 
-                foreach (var packet in _packetsList)
+                foreach (var packet in currentAgentPackets.Packets)
                 {
                     if (packet is IPv4Document ipv4)                   
                         Indexator.IndexIPv4(bulkDescriptor, ipv4);
@@ -371,7 +395,7 @@ namespace PacketDataIndexer
 
                 await _elasticSearchService.BulkAsync(bulkDescriptor, stoppingToken);
 
-                _packetsList.Clear();
+                currentAgentPackets.Packets.Clear();
             }
         }
     }
